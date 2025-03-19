@@ -144,7 +144,11 @@ const filters: ArtistRankingsFilters = {
             { name: 'filter_artist_type_other_voice_synth', value: ArtistType.OTHER_VOICE_SYNTHESIZER },
             { name: 'filter_artist_type_utau', value: ArtistType.UTAU },
             { name: 'filter_artist_type_project_sekai', value: ArtistType.PROJECT_SEKAI },
-            { name: 'filter_artist_type_voiceroid', value: ArtistType.VOICEROID }
+            { name: 'filter_artist_type_voicevox', value: ArtistType.VOICEVOX },
+            { name: 'filter_artist_type_voisona', value: ArtistType.VOISONA },
+            { name: 'filter_artist_type_neutrino', value: ArtistType.NEUTRINO },
+            { name: 'filter_artist_type_voiceroid', value: ArtistType.VOICEROID },
+            { name: 'filter_artist_type_new_type', value: ArtistType.NEW_TYPE }
         ],
         defaultValue: artistCategoryToApiArtistTypes[ArtistCategory.VOCALIST]
     },
@@ -161,7 +165,11 @@ const filters: ArtistRankingsFilters = {
             { name: 'filter_artist_type_other_voice_synth', value: ArtistType.OTHER_VOICE_SYNTHESIZER },
             { name: 'filter_artist_type_utau', value: ArtistType.UTAU },
             { name: 'filter_artist_type_project_sekai', value: ArtistType.PROJECT_SEKAI },
-            { name: 'filter_artist_type_voiceroid', value: ArtistType.VOICEROID }
+            { name: 'filter_artist_type_voicevox', value: ArtistType.VOICEVOX },
+            { name: 'filter_artist_type_voisona', value: ArtistType.VOISONA },
+            { name: 'filter_artist_type_neutrino', value: ArtistType.NEUTRINO },
+            { name: 'filter_artist_type_voiceroid', value: ArtistType.VOICEROID },
+            { name: 'filter_artist_type_new_type', value: ArtistType.NEW_TYPE }
         ]
     },
     minViews: {

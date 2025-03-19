@@ -22,7 +22,11 @@ export const ArtistTypeLocaleTokens: {[key in ArtistType]: LanguageDictionaryKey
     [ArtistType.OTHER_GROUP]: 'filter_artist_type_other_group',
     [ArtistType.UTAU]: 'filter_artist_type_utau',
     [ArtistType.PROJECT_SEKAI]: 'filter_artist_type_project_sekai',
-    [ArtistType.VOICEROID]: 'filter_artist_type_voiceroid'
+    [ArtistType.VOICEVOX]: 'filter_artist_type_voicevox',
+    [ArtistType.VOISONA]: 'filter_artist_type_voisona',
+    [ArtistType.NEUTRINO]: 'filter_artist_type_neutrino',
+    [ArtistType.VOICEROID]: 'filter_artist_type_voiceroid',
+    [ArtistType.NEW_TYPE]: 'filter_artist_type_new_type'
 }
 
 export const SongTypeLocaleTokens: {[key in SongType]: LanguageDictionaryKey} = {
