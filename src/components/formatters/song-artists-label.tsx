@@ -48,7 +48,7 @@ export function SongArtistsLabel(
                     }}
                 >
                     <Link
-                        href={`artist/${artist.id}`}
+                        href={`../artist/${artist.id}`}
                         className="text-on-surface-variant transition-colors hover:text-inherit"
                     >
                         <EntityName
