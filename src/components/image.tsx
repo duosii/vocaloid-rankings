@@ -22,6 +22,8 @@ export default function Image(
         priority?: boolean
     }
 ) {
+    // hacky quick fix for vocadb artist urls
+    src = src.replace("artist", "Artist");
     return <img
         src={src}
         alt={alt}
