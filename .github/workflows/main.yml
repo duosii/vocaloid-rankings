@@ -17,4 +17,4 @@ jobs:
         curl -X POST \
         -H "Content-Type: application/json" \
         --data '{ "query": "mutation { refreshAllSongsViews }" }' \
-        https://vocaloid-rankings.fly.dev/api/v1
+        https://vocarank.ing/api/v1

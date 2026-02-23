@@ -28,7 +28,7 @@ const enum Pragma {
 }
 
 const dbPragmas = {
-    [Pragma.DEFAULT]: "journal_mode = WAL"
+    [Pragma.DEFAULT]: "journal_mode = WAL, foreign_keys = ON"
 }
 
 const databaseMetadata = {
@@ -36,7 +36,7 @@ const databaseMetadata = {
         path: 'songs_data.db',
         pragma: Pragma.DEFAULT,
         init: initSongsData,
-        extensions: [rootDirectory + '/src/data/extensions/spellfix']
+        extensions: []//rootDirectory + '/src/data/extensions/spellfix']
     },
     [Databases.AUTH]: {
         path: 'auth.db',

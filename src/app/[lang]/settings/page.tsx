@@ -2,17 +2,16 @@ import { Locale, getDictionary } from "@/localization"
 import { Metadata } from "next"
 import { SettingsSelectors } from "./settings-selectors"
 import { Settings } from "."
-import { cookies } from "next/dist/client/components/headers"
+import { cookies } from "next/headers"
 
 export async function generateMetadata(
-    {
-        params
-    }: {
-        params: {
+    props: {
+        params: Promise<{
             lang: Locale
-        }
+        }>
     }
 ): Promise<Metadata> {
+    const params = await props.params;
     const langDict = await getDictionary(params.lang)
 
     return {
@@ -21,19 +20,18 @@ export async function generateMetadata(
 }
 
 export default async function AddSongPage(
-    {
-        params
-    }: {
-        params: {
+    props: {
+        params: Promise<{
             lang: Locale
-        }
+        }>
     }
 ) {
+    const params = await props.params;
     // get lang dict
     const langDict = await getDictionary(params.lang)
 
     // get settings
-    const settings = new Settings(cookies())
+    const settings = new Settings(await cookies())
 
     return (
         <section className="flex flex-col gap-5 w-full min-h-screen max-w-4xl">
@@ -48,5 +46,4 @@ export default async function AddSongPage(
             }}/>
         </section>
     )
-
 }

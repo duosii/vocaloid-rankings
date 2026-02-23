@@ -15,6 +15,9 @@ import { useRef, useState } from "react"
 import { Filter, FilterType, InputFilter, MultiFilter, RankingsViewMode, SelectFilter, TrendingFilterBarValues, TrendingFilters } from "./types"
 import { ToggleGroupFilterElement } from "@/components/filter/toggle-group-filter"
 import { MultiSelectFilterElement } from "@/components/filter/multi-select-filter"
+import { FilledTonalButton } from "@/components/material/filled-tonal-button"
+
+const minimumTimestampMillis = 29 * 24 * 60 * 60 * 1000
 
 export function TrendingActiveFilterBar(
     {
@@ -23,12 +26,14 @@ export function TrendingActiveFilterBar(
         currentTimestamp,
         setFilterValues,
         setRankingsViewMode,
+        playlistUrl
     }: {
         filters: TrendingFilters
         filterValues: TrendingFilterBarValues
         currentTimestamp: Date
         setFilterValues: (newValues: TrendingFilterBarValues, route?: boolean, merge?: boolean) => void,
-        setRankingsViewMode: (newMode: RankingsViewMode) => void
+        setRankingsViewMode: (newMode: RankingsViewMode) => void,
+        playlistUrl: string | null
     }
 ) {
 
@@ -42,8 +47,10 @@ export function TrendingActiveFilterBar(
 
     // options
     const sourceTypesOptions = filters.includeSourceTypes.values.map(value => langDict[value.name])
+    const songTypesOptions = filters.includeSongTypes.values.map(value => langDict[value.name])
 
     // timestamps
+    const minimumTimestampIso = generateTimestamp(new Date(currentTimestamp.getTime() - minimumTimestampMillis))
     const currentTimestampIso = generateTimestamp(currentTimestamp)
 
     // build active filters
@@ -81,17 +88,19 @@ export function TrendingActiveFilterBar(
                 }
                 case FilterType.MULTI: {
                     const options = (filter as MultiFilter<number>).values
+                    const defaultValues = (filter as MultiFilter<number>).defaultValue || []
                     const parsedValue = value as number[]
                     if (parsedValue.length > 0) {
-                        parsedValue.forEach(val => {
-                            if (!isNaN(val)) {
+                        for (const n in parsedValue) {
+                            const val = parsedValue[n]
+                            if (!isNaN(val) && defaultValues[n] !== val) {
                                 activeFilters.push(<ActiveFilter name={`${langDict[filter.name]}: ${langDict[options[val].name]}`} onClick={() => {
                                     parsedValue.splice(parsedValue.indexOf(val), 1)
                                     filterValues[key as keyof typeof filterValues] = [...parsedValue] as any
                                     setFilterValues(filterValues)
                                 }} />)
                             }
-                        })
+                        }
                     }
                     break
                 }
@@ -116,6 +125,13 @@ export function TrendingActiveFilterBar(
                 setFilterValues(filterValues)
             }} />
 
+            {/* Song Type */}
+            <ToggleGroupFilterElement name={langDict['filter_song_type']} included={filterValues.includeSongTypes || []} excluded={filterValues.excludeSongTypes || []} options={songTypesOptions} onValueChanged={(newIncluded, newExcluded) => {
+                filterValues.includeSongTypes = [...newIncluded]
+                filterValues.excludeSongTypes = [...newExcluded]
+                setFilterValues(filterValues)
+            }} />
+
             {/* Time Period */}
             <SelectFilterElement
                 name={langDict[filters.timePeriod.name]}
@@ -128,6 +144,7 @@ export function TrendingActiveFilterBar(
                 }}
             />
 
+
             {/* Timestamp */}
             {filterValues.timePeriod == 3 ? (
                 <>
@@ -136,6 +153,7 @@ export function TrendingActiveFilterBar(
                     <DateFilterElement
                         name={langDict.filter_time_period_offset_custom_from}
                         value={filterValues.from || currentTimestamp}
+                        min={minimumTimestampIso}
                         max={currentTimestampIso}
                         onValueChanged={newValue => {
                             filterValues.from = newValue
@@ -147,6 +165,7 @@ export function TrendingActiveFilterBar(
                     <DateFilterElement
                         name={langDict.filter_time_period_offset_custom_to}
                         value={filterValues.timestamp || currentTimestamp}
+                        min={minimumTimestampIso}
                         max={currentTimestampIso}
                         onValueChanged={newValue => {
                             filterValues.timestamp = newValue
@@ -159,6 +178,7 @@ export function TrendingActiveFilterBar(
                 : <DateFilterElement
                     name={langDict[filters.timestamp.name]}
                     value={filterValues.timestamp || currentTimestamp}
+                    min={minimumTimestampIso}
                     max={currentTimestampIso}
                     onValueChanged={newValue => {
                         filterValues.timestamp = newValue
@@ -201,12 +221,13 @@ export function TrendingActiveFilterBar(
                     <IconButton icon='view_agenda' onClick={_ => setRankingsViewMode(RankingsViewMode.LIST)} />
                     <IconButton icon='grid_view' onClick={_ => setRankingsViewMode(RankingsViewMode.GRID)} />
 
+                    <li key='listen-button'><FilledTonalButton icon="headphones" text={langDict.rankings_listen} href={playlistUrl ?? ""}/></li>
                     <li key='filter-button' className="md:block hidden"><FilledButton icon={filtersExpanded ? 'expand_less' : 'expand_more'} text={langDict.rankings_filter} onClick={() => setFiltersExpanded(!filtersExpanded)} /></li>
                 </ul>
             </div>
 
             {/* floating action button */}
-            <FloatingActionButton icon='filter_alt' className="md:hidden fixed" onClick={() => setDrawerOpen(!drawerOpen)} />
+            <FloatingActionButton icon='filter_alt' className="md:hidden" onClick={() => setDrawerOpen(!drawerOpen)} />
         </ul>
 
         <Expander visible={filtersExpanded} className="w-full md:grid hidden">
@@ -222,6 +243,20 @@ export function TrendingActiveFilterBar(
                     options={sourceTypesOptions} onValueChanged={(newIncluded, newExcluded) => {
                         filterValues.includeSourceTypes = [...newIncluded]
                         filterValues.excludeSourceTypes = [...newExcluded]
+                        setFilterValues(filterValues)
+                    }}
+                />
+
+                {/* Song Type */}
+                <MultiSelectFilterElement
+                    name={langDict['filter_song_type']}
+                    placeholder={langDict['filter_year_any']}
+                    included={filterValues.includeSongTypes || []}
+                    excluded={filterValues.excludeSongTypes || []}
+                    options={songTypesOptions}
+                    onValueChanged={(newIncluded, newExcluded) => {
+                        filterValues.includeSongTypes = [...newIncluded]
+                        filterValues.excludeSongTypes = [...newExcluded]
                         setFilterValues(filterValues)
                     }}
                 />
@@ -246,6 +281,7 @@ export function TrendingActiveFilterBar(
                         <DateFilterElement
                             name={langDict.filter_time_period_offset_custom_from}
                             value={filterValues.from || currentTimestamp}
+                            min={minimumTimestampIso}
                             max={currentTimestampIso}
                             onValueChanged={newValue => {
                                 filterValues.from = newValue
@@ -257,6 +293,7 @@ export function TrendingActiveFilterBar(
                         <DateFilterElement
                             name={langDict.filter_time_period_offset_custom_to}
                             value={filterValues.timestamp || currentTimestamp}
+                            min={minimumTimestampIso}
                             max={currentTimestampIso}
                             onValueChanged={newValue => {
                                 filterValues.timestamp = newValue
@@ -269,6 +306,7 @@ export function TrendingActiveFilterBar(
                     : <DateFilterElement
                         name={langDict[filters.timestamp.name]}
                         value={filterValues.timestamp || currentTimestamp}
+                        min={minimumTimestampIso}
                         max={currentTimestampIso}
                         onValueChanged={newValue => {
                             filterValues.timestamp = newValue

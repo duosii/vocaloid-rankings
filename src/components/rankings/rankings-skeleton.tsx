@@ -4,6 +4,8 @@ import { RankingsSkeletonGridItem } from "./rankings-grid-skeleton-item";
 import { RankingsList } from "./rankings-list";
 import { RankingsGrid } from "./rankings-grid";
 
+import type { JSX } from "react";
+
 export function RankingsSkeleton(
     {
         elementCount,

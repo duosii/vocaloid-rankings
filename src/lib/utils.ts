@@ -1,8 +1,55 @@
 import { ArtistCategory, ArtistType } from "@/data/types"
-import { MutableRefObject } from "react"
+import { RefObject } from "react"
+
+/**
+ * Takes an array and generates chunks of chunkSize from this array.
+ * 
+ * For example, if you had an array of length 100 and a chunkSize of 50, 
+ * this generator would generate two arrays of 50 length from that
+ * original array.
+ * 
+ * @param arr The array to generate chunks from.
+ * @param chunkSize The size of chunks to generate.
+ */
+export function* chunks<T>(arr: T[], chunkSize: number): Generator<T[]> {
+    for (let i = 0; i < arr.length; i += chunkSize) {
+        yield arr.slice(i, i + chunkSize);
+    }
+}
+
+export async function retryWithExpontentialBackoff<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000,
+    maxDelay: number = 10000,
+): Promise<T | null> {
+    let retries = 0;
+
+    while (retries < maxRetries) {
+        try {
+            return await operation()
+        } catch (err) {
+            console.error(err)
+            
+            retries++;
+
+            if (retries === maxRetries) {
+                break
+            }
+
+            const delay = Math.min(
+                baseDelay * Math.pow(2, retries - 1) + Math.random() * 1000,
+                maxDelay
+            )
+
+            await new Promise(resolve => setTimeout(resolve, delay))
+        }
+    }
+    return null
+}
 
 export function timeoutDebounce(
-    ref: MutableRefObject<NodeJS.Timeout | undefined>,
+    ref: RefObject<NodeJS.Timeout | undefined>,
     timeout: number,
     callback: () => void
 ) {
@@ -58,6 +105,7 @@ export function mapArtistTypeToCategory(
         case ArtistType.OTHER_VOICE_SYNTHESIZER:
         case ArtistType.UTAU:
         case ArtistType.PROJECT_SEKAI:
+        case ArtistType.VOICEROID:
             return ArtistCategory.VOCALIST
         default:
             return ArtistCategory.PRODUCER
@@ -74,8 +122,8 @@ export function substituteStringVariables(
     }
     return toSub
 }
-export const artistCategoryToApiArtistTypes: {
-    [key in ArtistCategory]: string[];
+export const artistCategoryToApiArtistTypeNames: {
+    [key in ArtistCategory]: String[];
 } = {
     [ArtistCategory.VOCALIST]: [
         ArtistType[ArtistType.VOCALOID],
@@ -84,7 +132,8 @@ export const artistCategoryToApiArtistTypes: {
         ArtistType[ArtistType.OTHER_VOCALIST],
         ArtistType[ArtistType.OTHER_VOICE_SYNTHESIZER],
         ArtistType[ArtistType.UTAU],
-        ArtistType[ArtistType.PROJECT_SEKAI]
+        ArtistType[ArtistType.PROJECT_SEKAI],
+        ArtistType[ArtistType.VOICEROID]
     ],
     [ArtistCategory.PRODUCER]: [
         ArtistType[ArtistType.ILLUSTRATOR],
@@ -93,5 +142,28 @@ export const artistCategoryToApiArtistTypes: {
         ArtistType[ArtistType.PRODUCER],
         ArtistType[ArtistType.OTHER_INDIVIDUAL],
         ArtistType[ArtistType.OTHER_GROUP]
+    ]
+};
+
+export const artistCategoryToApiArtistTypes: {
+    [key in ArtistCategory]: ArtistType[];
+} = {
+    [ArtistCategory.VOCALIST]: [
+        ArtistType.VOCALOID,
+        ArtistType.CEVIO,
+        ArtistType.SYNTHESIZER_V,
+        ArtistType.OTHER_VOCALIST,
+        ArtistType.OTHER_VOICE_SYNTHESIZER,
+        ArtistType.UTAU,
+        ArtistType.PROJECT_SEKAI,
+        ArtistType.VOICEROID
+    ],
+    [ArtistCategory.PRODUCER]: [
+        ArtistType.ILLUSTRATOR,
+        ArtistType.COVER_ARTIST,
+        ArtistType.ANIMATOR,
+        ArtistType.PRODUCER,
+        ArtistType.OTHER_INDIVIDUAL,
+        ArtistType.OTHER_GROUP
     ]
 };

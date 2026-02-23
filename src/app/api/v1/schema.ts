@@ -1,5 +1,5 @@
-import { deleteSongUser, filterArtistRankings, filterSongRankings, getArtist, getArtistPlacement, getArtistViews, getMostRecentViewsTimestamp, getSong, getSongPlacement, getSongViews, insertSong, insertSongViews, refreshAllSongsViews, searchArtists, songExists, updateSong } from '@/data/songsData'
-import { Artist, ArtistCategory, ArtistRankingsFilterParams, ArtistThumbnailType, ArtistThumbnails, FilterDirection, FilterInclusionMode, FilterOrder, NameType, Names, Song, SongArtistsCategories, SongRankingsFilterParams, SongVideoIds, SourceType, VideoViews, ViewsBreakdown } from '@/data/types'
+import { deleteSongUser, filterArtistRankings, filterSongRankings, getArtist, getArtistPlacement, getArtistViews, getMostRecentViewsTimestamp, getSong, getSongPlacement, getSongViews, insertSong, insertSongViews, refreshAllSongsViews, searchArtists, serachSongs, songExists, updateSong } from '@/data/songsData'
+import { Artist, ArtistCategory, ArtistRankingsFilterParams, ArtistThumbnailType, ArtistThumbnails, FilterDirection, FilterInclusionMode, FilterOrder, NameType, Names, Song, SongArtistsCategories, SongRankingsFilterParams, SongVideoIds, SourceType, UserAccessLevel, VideoViews, ViewsBreakdown } from '@/data/types'
 import { getVocaDBSong, parseVocaDBSongId } from '@/lib/vocadb'
 import {
     GraphQLEnumType,
@@ -20,7 +20,7 @@ import { GraphQLContext } from './types'
  * SCHEMA OVERVIEW
  * 
  * ```graphql
- * enum SongType { ORIGINAL, REMIX, COVER, OTHER }
+ * enum SongType { ORIGINAL, REMIX, COVER, OTHER, REMASTER, DRAMA_PV, MUSIC_PV }
  * 
  * enum SourceType { YOUTUBE, NICONICO, BILIBILI }
  * 
@@ -199,6 +199,7 @@ import { GraphQLContext } from './types'
  *     minViews: Long
  *     maxViews: Long
  *     search: String
+ *     list: Int
  *   ): SongRankingsFilterResult
  * 
  *   artistRankings(
@@ -238,6 +239,13 @@ import { GraphQLContext } from './types'
  *     maxEntries: Int
  *     startAt: Int
  *   ): [Artist]
+ * 
+ *   searchSongs(
+ *     query: String!
+ *     excludeSongs: [Int]
+ *     maxEntries: Int
+ *     startAt: Int
+ *   ): [Song]
  * }
  * 
  * type Mutation {
@@ -302,6 +310,16 @@ const songTypeEnum = new GraphQLEnumType({
             value: 3,
             description: "A song that is a cover of another."
         },
+        REMASTER: {
+            value: 4,
+            description: "A song that is a remaster of an older song."
+        },
+        DRAMA_PV: {
+            value: 5
+        },
+        MUSIC_PV: {
+            value: 6
+        }
     }
 })
 
@@ -381,6 +399,10 @@ const artistTypeEnum = new GraphQLEnumType({
         PROJECT_SEKAI: {
             value: 12,
             description: 'A singer from the mobile rythm game Project: Sekai Colorful Stage'
+        },
+        VOICEROID: {
+            value: 13,
+            description: 'A voicebank that uses the voiceroid software.'
         }
     }
 })
@@ -1166,6 +1188,13 @@ const artistRankingsFilterResultType = new GraphQLObjectType({
 *     maxEntries: Int
 *     startAt: Int
 *   ): [Artist]
+* 
+*   searchSongs(
+*     query: String!
+*     excludeSongs: [Int]
+*     maxEntries: Int
+*     startAt: Int
+*   ): [Song]
 * }
 */
 const queryType = new GraphQLObjectType({
@@ -1285,6 +1314,10 @@ const queryType = new GraphQLObjectType({
                 search: {
                     type: GraphQLString,
                     description: 'Only includes songs who have names that match the search query.'
+                },
+                list: {
+                    type: GraphQLInt,
+                    description: 'The ID of the list to include songs from.'
                 }
             },
             resolve: (
@@ -1317,7 +1350,8 @@ const queryType = new GraphQLObjectType({
                     startAt,
                     minViews,
                     maxViews,
-                    search
+                    search,
+                    list
                 }: {
                     timestamp?: string
                     timePeriodOffset?: number
@@ -1347,6 +1381,7 @@ const queryType = new GraphQLObjectType({
                     minViews?: number
                     maxViews?: number
                     search?: string
+                    list?: number
                 }
             ) => {
                 // build params
@@ -1379,6 +1414,7 @@ const queryType = new GraphQLObjectType({
                 filterParams.minViews = minViews
                 filterParams.maxViews = maxViews
                 filterParams.search = search != undefined ? `%${search.trim()}%` : undefined
+                filterParams.list = list
                 return filterSongRankings(filterParams)
             }
         },
@@ -1645,7 +1681,7 @@ const queryType = new GraphQLObjectType({
                 { ids }: { ids: number[] }
             ) => ids.map(id => getArtist(id, false, false))
         },
-        searchArtist: {
+        searchArtists: {
             type: new GraphQLList(artistType),
             args: {
                 query: {
@@ -1683,6 +1719,46 @@ const queryType = new GraphQLObjectType({
                 Math.min(maxEntries || 50, 50),
                 Math.abs(startAt || 0),
                 excludeArtists
+            )
+        },
+        searchSongs: {
+            type: new GraphQLList(songType),
+            args: {
+                query: {
+                    type: new GraphQLNonNull(GraphQLString),
+                    description: 'The name of the song to search for.'
+                },
+                maxEntries: {
+                    type: GraphQLInt,
+                    description: 'The maximum number of results to return. The maximum value is 50.'
+                },
+                startAt: {
+                    type: GraphQLInt,
+                    description: 'The placement to start getting results at.'
+                },
+                excludeSongs: {
+                    type: new GraphQLList(GraphQLInt),
+                    description: 'A list of song IDs to exclude from the search results.'
+                },
+            },
+            resolve: async (
+                _source,
+                {
+                    query,
+                    maxEntries,
+                    startAt,
+                    excludeSongs
+                }: {
+                    query: string
+                    maxEntries: number | undefined
+                    startAt: number | undefined
+                    excludeSongs: number[]
+                }
+            ) => serachSongs(
+                query.trim(),
+                Math.min(maxEntries || 50, 50),
+                Math.abs(startAt || 0),
+                excludeSongs
             )
         }
     }
@@ -1745,14 +1821,18 @@ const mutationType = new GraphQLObjectType({
                     id
                 }: {
                     id: number
-                }
+                },
+                context: GraphQLContext
             ) => getSong(id)
                 .then(async song => {
                     if (!song) throw new Error(`Song with ID ${id} does not exist.`)
+                    
+                    const isAuthorized = (context.user !== null && context.user.accessLevel >= UserAccessLevel.MODERATOR)
+
                     // ensure that the song hasn't been refreshed yet
                     const lastRefreshed = song.lastRefreshed
                     const dateNow = new Date()
-                    if (lastRefreshed && ((24 * 60 * 60 * 1000) > (dateNow.getTime() - new Date(lastRefreshed).getTime()))) throw new Error('Songs can only be refreshed once a day.')
+                    if ((lastRefreshed && ((24 * 60 * 60 * 1000) > (dateNow.getTime() - new Date(lastRefreshed).getTime()))) && !isAuthorized) throw new Error('Songs can only be refreshed once a day.')
 
                     // get the refreshed song from voca DB
                     const vocaDbSong = (await getVocaDBSong(id)) as Partial<Song> & Pick<Song, "id">

@@ -18,7 +18,7 @@ export function BaseIconButton(
         onClick?: MouseEventHandler
     }
 ) {
-    const finalClassName = `w-[40px] h-[40px] rounded-full flex items-center justify-center ${className}`
+    const finalClassName = `w-[40px] h-[40px] min-w-10 rounded-full flex items-center justify-center ${className}`
     return (
         href ? (
             <Link className={finalClassName} href={href} onClick={onClick} style={style}>

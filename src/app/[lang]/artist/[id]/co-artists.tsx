@@ -10,7 +10,7 @@ import { ArtistCategory } from "@/data/types"
 import { GET_ARTIST_RANKINGS, buildEntityNames } from "@/lib/api"
 import { ApiArtistRankingsFilterResult } from "@/lib/api/types"
 import { substituteStringVariables } from "@/lib/utils"
-import { artistCategoryToApiArtistTypes } from "@/lib/utils"
+import { artistCategoryToApiArtistTypeNames } from "@/lib/utils"
 import { LanguageDictionary, getEntityName } from "@/localization"
 import { useQuery } from "graphql-hooks"
 import { useTheme } from "next-themes"
@@ -44,7 +44,7 @@ export function CoArtists(
     const { loading, error, data } = useQuery(GET_ARTIST_RANKINGS, {
         variables: {
             includeCoArtistsOf: [artistId],
-            includeArtistTypes: artistCategoryToApiArtistTypes[categoryInversed],
+            includeArtistTypes: artistCategoryToApiArtistTypeNames[categoryInversed],
             minViews: 1,
             maxEntries: maxEntries,
             orderBy: "SONG_COUNT"

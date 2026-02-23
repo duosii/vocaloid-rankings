@@ -7,18 +7,17 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArtistSongs } from './artist/[id]/artist-songs'
 import { Settings } from './settings'
-import { cookies } from 'next/dist/client/components/headers'
+import { cookies } from 'next/headers'
 import { RankingsItemTrailingMode } from '@/components/rankings/rankings-item-trailing'
 
 export async function generateMetadata(
-  {
-    params
-  }: {
-    params: {
+  props: {
+    params: Promise<{
       lang: Locale
-    }
+    }>
   }
 ): Promise<Metadata> {
+  const params = await props.params;
   const langDict = await getDictionary(params.lang)
 
   return {
@@ -27,19 +26,18 @@ export async function generateMetadata(
 }
 
 export default async function Home(
-  {
-    params
-  }: {
-    params: {
+  props: {
+    params: Promise<{
       lang: Locale
-    }
+    }>
   }
 ) {
+  const params = await props.params;
   const locale = params.lang
   const langDict = await getDictionary(locale)
-  
+
   // get settings
-  const settings = new Settings(cookies())
+  const settings = new Settings(await cookies())
 
   // general variables
   const settingTitleLanguage = settings.titleLanguage
@@ -53,7 +51,7 @@ export default async function Home(
   songBirthdaysParams.publishDate = buildFuzzyDate(undefined, currentMonth.toString(), currentDay.toString())
   songBirthdaysParams.maxEntries = 6
   const songBirthdays = await filterSongRankings(songBirthdaysParams)
-  
+
   return (
     <article className='w-full h-fit flex flex-col gap-5 justify-start items-center'>
       <section className='w-full flex flex-col justify-start items-center gap-8 mt-28'>

@@ -1,11 +1,10 @@
 import { getMostRecentViewsTimestamp } from "@/data/songsData"
 import { ArtistCategory, ArtistType, FilterDirection, FilterOrder, SongType, SourceType } from "@/data/types"
-import { generateTimestamp } from "@/lib/utils"
-import { artistCategoryToApiArtistTypes } from "@/lib/utils"
+import { artistCategoryToApiArtistTypes, generateTimestamp } from "@/lib/utils"
 import { Locale, getDictionary } from "@/localization"
-import { cookies } from "next/dist/client/components/headers"
+import { cookies } from "next/headers"
 import { Settings } from "../../settings"
-import { ArtistRankingsFilters, ArtistRankingsFiltersValues, FilterType } from "../types"
+import { ArtistRankingsFilters, FilterType } from "../types"
 import { ArtistRankingsList } from "../artist-rankings-list"
 import { Metadata } from "next"
 
@@ -110,7 +109,11 @@ const filters: ArtistRankingsFilters = {
         values: [
             { name: 'filter_song_type_original', value: SongType.ORIGINAL },
             { name: 'filter_song_type_remix', value: SongType.REMIX },
-            { name: 'filter_song_type_other', value: SongType.OTHER },
+            { name: 'filter_song_type_cover', value: SongType.COVER },
+            { name: 'filter_song_type_remaster', value: SongType.REMASTER },
+            { name: "filter_song_type_drama_pv", value: SongType.DRAMA_PV},
+            { name: "filter_song_type_music_pv", value: SongType.MUSIC_PV},
+            { name: 'filter_song_type_other', value: SongType.OTHER }
         ]
     },
     excludeSongTypes: {
@@ -121,7 +124,11 @@ const filters: ArtistRankingsFilters = {
         values: [
             { name: 'filter_song_type_original', value: SongType.ORIGINAL },
             { name: 'filter_song_type_remix', value: SongType.REMIX },
-            { name: 'filter_song_type_other', value: SongType.OTHER },
+            { name: 'filter_song_type_cover', value: SongType.COVER },
+            { name: 'filter_song_type_remaster', value: SongType.REMASTER },
+            { name: "filter_song_type_drama_pv", value: SongType.DRAMA_PV},
+            { name: "filter_song_type_music_pv", value: SongType.MUSIC_PV},
+            { name: 'filter_song_type_other', value: SongType.OTHER }
         ]
     },
     includeArtistTypes: {
@@ -260,14 +267,13 @@ const filters: ArtistRankingsFilters = {
 }
 
 export async function generateMetadata(
-    {
-        params
-    }: {
-        params: {
+    props: {
+        params: Promise<{
             lang: Locale
-        }
+        }>
     }
 ): Promise<Metadata> {
+    const params = await props.params;
     const langDict = await getDictionary(params.lang)
 
     return {
@@ -276,22 +282,19 @@ export async function generateMetadata(
 }
 
 export default async function RankingsPage(
-    {
-        params,
-        searchParams
-    }: {
-        params: {
+    props: {
+        params: Promise<{
             lang: Locale
-        },
-        searchParams: ArtistRankingsFiltersValues
+        }>
     }
 ) {
+    const params = await props.params;
     // import language dictionary
     const lang = params.lang
     const langDict = await getDictionary(lang)
 
     // get settings
-    const settings = new Settings(cookies())
+    const settings = new Settings(await cookies())
 
     // general variables
     const viewMode = settings.rankingsViewMode
@@ -304,12 +307,11 @@ export default async function RankingsPage(
             <ArtistRankingsList
                 href=''
                 filters={filters}
-                filterValues={searchParams}
+                defaultFilters={{}}
                 currentTimestamp={mostRecentTimestamp}
                 viewMode={viewMode}
                 category={ArtistCategory.PRODUCER}
             />
         </section>
     )
-
 }

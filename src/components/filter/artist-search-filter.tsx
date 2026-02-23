@@ -7,7 +7,6 @@ import { getEntityName } from "@/localization"
 import { Result, APIError, GraphQLResponseError } from "graphql-hooks"
 import { useEffect, useRef, useState } from "react"
 import { FadeInOut } from "../transitions/fade-in-out"
-import { ActiveFilter } from "./active-filter"
 import { FilterElement } from "./filter"
 import { Elevation, elevationToClass } from ".."
 import { FilterInclusionMode } from "@/data/types"
@@ -18,7 +17,7 @@ query ArtistSearch(
     $query: String!
     $excludeArtists: [Int]
 ) {
-    searchArtist(
+    searchArtists(
         query: $query
         maxEntries: 5
         excludeArtists: $excludeArtists
@@ -75,14 +74,14 @@ export function ArtistSearchFilter(
 
     // react refs
     const modalRef = useRef<HTMLUListElement>(null)
-    const timeoutRef = useRef<NodeJS.Timeout>()
+    const timeoutRef = useRef<NodeJS.Timeout>(undefined)
 
     // graphql context
     const [loading, setLoading] = useState(false)
     const [apiError, setApiError] = useState(null as APIError<GraphQLResponseError> | null)
     const [apiData, setApiData] = useState(null as any)
 
-    const searchResult = apiData?.searchArtist as ApiArtist[]
+    const searchResult = apiData?.searchArtists as ApiArtist[]
 
     // settings
     const { settings } = useSettings()
@@ -97,12 +96,12 @@ export function ArtistSearchFilter(
         }
     }
 
-    function removeArtist(id: number) {
-        value.splice(value.indexOf(id), 1)
-        if (onValueChanged) {
-            onValueChanged(value)
-        }
-    }
+    // function removeArtist(id: number) {
+    //     value.splice(value.indexOf(id), 1)
+    //     if (onValueChanged) {
+    //         onValueChanged(value)
+    //     }
+    // }
 
     const onInputChanged = (input: string) => {
         setSearchQuery(input.toLowerCase())

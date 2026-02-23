@@ -81,14 +81,14 @@ export class InputFilter extends Filter {
 
 export class MultiFilter<Enum> extends Filter {
     values: SelectFilterValue<Enum>[]
-    defaultValue?: string[]
+    defaultValue?: Enum[]
 
     constructor(
         name: LanguageDictionaryKey,
         key: string,
         displayActive: boolean = true,
         values: SelectFilterValue<Enum>[],
-        defaultValue?: string[]
+        defaultValue?: Enum[]
     ) {
         super(name, key, displayActive, FilterType.MULTI)
         this.values = values
@@ -171,7 +171,7 @@ export interface RankingsFilters {
 
 export interface SongRankingsFiltersValues {
     search?: string
-    timePeriod?: number
+    timePeriod?: string
     publishYear?: string
     publishMonth?: string
     publishDay?: string
@@ -181,21 +181,22 @@ export interface SongRankingsFiltersValues {
     excludeSourceTypes?: string
     excludeSongTypes?: string
     excludeArtistTypes?: string
-    includeArtistTypesMode?: number
-    excludeArtistTypesMode?: number
+    includeArtistTypesMode?: string
+    excludeArtistTypesMode?: string
     minViews?: string
     maxViews?: string
-    orderBy?: number
+    orderBy?: string
     from?: string
     timestamp?: string
-    singleVideo?: number
+    singleVideo?: string
     includeArtists?: string
     excludeArtists?: string
-    includeArtistsMode?: number
-    excludeArtistsMode?: number
-    includeSimilarArtists?: number
-    direction?: number
+    includeArtistsMode?: string
+    excludeArtistsMode?: string
+    includeSimilarArtists?: string
+    direction?: string
     startAt?: string
+    list?: string
 }
 
 export interface SongRankingsFilterBarValues {
@@ -225,6 +226,7 @@ export interface SongRankingsFilterBarValues {
     includeSimilarArtists?: boolean
     direction?: number
     startAt?: string
+    list?: number
 }
 
 // artists rankings filters
@@ -260,7 +262,7 @@ export interface ArtistRankingsFilters {
 
 export interface ArtistRankingsFiltersValues {
     search?: string
-    timePeriod?: number
+    timePeriod?: string
     songPublishYear?: string
     songPublishMonth?: string
     songPublishDay?: string
@@ -275,15 +277,15 @@ export interface ArtistRankingsFiltersValues {
     excludeArtistTypes?: string
     minViews?: string
     maxViews?: string
-    orderBy?: number
+    orderBy?: string
     from?: string
     timestamp?: string
-    singleVideo?: number
+    singleVideo?: string
     includeArtists?: string
     excludeArtists?: string
     includeCoArtistsOf?: string
-    combineSimilarArtists?: number
-    direction?: number
+    combineSimilarArtists?: string
+    direction?: string
     startAt?: string
 }
 
@@ -324,16 +326,21 @@ export interface TrendingFilters {
     startAt: InputFilter
     includeSourceTypes: MultiFilter<SourceType>
     excludeSourceTypes: MultiFilter<SourceType>
+    includeSongTypes: MultiFilter<SongType>
+    excludeSongTypes: MultiFilter<SongType>
+    
 }
 
 export interface TrendingFiltersValues {
-    timePeriod?: number
+    timePeriod?: string
     from?: string
     timestamp?: string
-    direction?: number
+    direction?: string
     startAt?: string
     includeSourceTypes?: string
     excludeSourceTypes?: string
+    includeSongTypes?: string
+    excludeSongTypes?: string
 }
 
 export interface TrendingFilterBarValues {
@@ -344,6 +351,8 @@ export interface TrendingFilterBarValues {
     startAt?: string
     includeSourceTypes?: number[]
     excludeSourceTypes?: number[]
+    includeSongTypes?: number[]
+    excludeSongTypes?: number[]
 }
 
 // describes a list of entity names with their ids mapped to a Names types

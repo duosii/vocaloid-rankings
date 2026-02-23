@@ -40,5 +40,6 @@ next-env.d.ts
 /src/data/toClone
 .dockerignore
 Dockerfile
+Dockerfile-old
 fly.toml
 /.get/

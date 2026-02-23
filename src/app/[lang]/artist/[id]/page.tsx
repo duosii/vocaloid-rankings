@@ -15,13 +15,15 @@ import { Locale, getDictionary, getEntityName } from "@/localization"
 import { ArtistTypeLocaleTokens, NameTypeLocaleTokens, SourceTypeLocaleTokens } from "@/localization/DictionaryTokenMaps"
 import { Hct, SchemeVibrant, argbFromHex } from "@material/material-color-utilities"
 import { Metadata } from "next"
-import { cookies } from "next/dist/client/components/headers"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Settings } from "../../settings"
 import { ArtistSongs } from "./artist-songs"
 import { CoArtists } from "./co-artists"
 import { RelatedArtists } from "./related-artists"
+
+import type { JSX } from "react";
+import { cookies } from "next/headers"
 
 // interfaces
 interface ViewsBreakdown {
@@ -31,17 +33,16 @@ interface ViewsBreakdown {
 }
 
 export async function generateMetadata(
-    {
-        params
-    }: {
-        params: {
+    props: {
+        params: Promise<{
             id: string,
             lang: Locale
-        }
+        }>
     }
 ): Promise<Metadata> {
+    const params = await props.params;
     // get settings
-    const settings = new Settings(cookies())
+    const settings = new Settings(await cookies())
     const settingTitleLanguage = settings.titleLanguage
 
     // get names
@@ -54,15 +55,14 @@ export async function generateMetadata(
 }
 
 export default async function ArtistPage(
-    {
-        params
-    }: {
-        params: {
+    props: {
+        params: Promise<{
             id: string
             lang: Locale
-        }
+        }>
     }
 ) {
+    const params = await props.params;
 
     // convert the id parameter into a number; get song data
     const artistId = Number(params.id)
@@ -82,7 +82,7 @@ export default async function ArtistPage(
     const artistRecentSongsRankingsFilterResults = artistTopSongsRankingsResultsCount >= artistTopSongsRankingsFilterParams.maxEntries * 2 ? await filterSongRankings(artistTopSongsRankingsFilterParams) : undefined
 
     // get settings
-    const settings = new Settings(cookies())
+    const settings = new Settings(await cookies())
 
     // general variables
     const artistTotalViews = Number(artist.views?.total) || 0

@@ -35,8 +35,11 @@ const nextConfig = {
   
       return config;
     },
-    transpilePackages: ['@mui/x-charts']
+    experimental: {
+      webpackMemoryOptimizations: false,
+      turbo: {}
+    },
+    output: "standalone"
   }
-  
-  module.exports = nextConfig
-  
+
+module.exports = nextConfig

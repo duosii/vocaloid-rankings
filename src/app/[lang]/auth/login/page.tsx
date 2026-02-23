@@ -4,14 +4,13 @@ import { Metadata } from "next"
 import { LoginForm } from "./login-form"
 
 export async function generateMetadata(
-    {
-        params
-    }: {
-        params: {
+    props: {
+        params: Promise<{
             lang: Locale
-        }
+        }>
     }
 ): Promise<Metadata> {
+    const params = await props.params;
     const langDict = await getDictionary(params.lang)
 
     return {
@@ -20,14 +19,13 @@ export async function generateMetadata(
 }
 
 export default async function LoginPage(
-    {
-        params
-    }: {
-        params: {
+    props: {
+        params: Promise<{
             lang: Locale
-        }
+        }>
     }
 ) {
+    const params = await props.params;
 
     // import language dictionary
     const lang = params.lang
@@ -39,5 +37,4 @@ export default async function LoginPage(
             <LoginForm/>
         </section>
     )
-
 }

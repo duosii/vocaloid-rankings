@@ -1,5 +1,11 @@
 import { DynamicColor, DynamicScheme, MaterialDynamicColors, hexFromArgb } from "@material/material-color-utilities";
-import { Palette, getPaletteFromURL } from "color-thief-node";
+import { getPalette, Palette } from "./colorthief";
+
+const validImageExtensions = {
+    "png": true,
+    "jpg": true,
+    "jpeg": true
+}
 
 // theme generation helper functions
 export const getCustomThemeStylesheet = (
@@ -62,14 +68,36 @@ export const getMostVibrantColor = (
     return mostVibrantColor;
 }
 
+const getImageUrlType = (
+    imageUrl: string
+): string | null => {
+    const imageFileName = imageUrl.split("/").pop() ?? "";
+    const withoutQuery = imageFileName.split("?")[0] ?? "";
+    const imageExtension = withoutQuery.split(".").pop();
+    
+    return imageExtension !== undefined && validImageExtensions[imageExtension as keyof typeof validImageExtensions] 
+        ? `image/${imageExtension}` 
+        : null
+}
+
 export const getImageMostVibrantColor = (
     imageUrl: string
 ): Promise<Palette> => {
+    
     return new Promise<Palette>((resolve, reject) => {
-        getPaletteFromURL(imageUrl)
+        const imageUrlType = getImageUrlType(imageUrl)
+        if (imageUrlType === null) {
+            return reject(`image extension is invalid (${imageUrl}). Must be one of [ ${Object.keys(validImageExtensions).join(", ")} ]`)
+        }
+
+        // load image
+        fetch(imageUrl)
+            .then(response => response.arrayBuffer())
+            .then(arrayBuf => Buffer.from(arrayBuf))
+            .then(imageBuf => getPalette(imageBuf))
             .then(palette => {
-                resolve(getMostVibrantColor(palette))
+                resolve(getMostVibrantColor(palette ?? []))
             })
-            .catch(error => reject(error))
+            .catch(error => reject(error));
     })
 }

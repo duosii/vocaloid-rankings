@@ -4,7 +4,7 @@ export function MinimalFilterElement(
         children,
         className = ''
     }: {
-        name: string,
+        name?: string,
         children?: React.ReactNode
         className?: string
     }

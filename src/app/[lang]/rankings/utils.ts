@@ -1,6 +1,7 @@
 import { FilterOrder } from "@/data/types"
-import { SelectFilterValue } from "./types"
+import { ArtistRankingsFilterBarValues, ArtistRankingsFilters, ArtistRankingsFiltersValues, FilterType, InputFilter, RankingsFilters, SelectFilterValue, SongRankingsFilterBarValues, SongRankingsFiltersValues, TrendingFilterBarValues, TrendingFilters } from "./types"
 import { RankingsItemTrailingMode } from "@/components/rankings/rankings-item-trailing"
+import { ReadonlyURLSearchParams } from "next/navigation"
 
 export function encodeBoolean(
     bool: boolean
@@ -41,6 +42,40 @@ export function decodeMultiFilter(
     return output
 }
 
+
+/**
+ * Helper function for extracting an integer value from search parameters.
+ * 
+ * @param params The search parameters to extract the value from.
+ * @param key The key of the value to extract.
+ * @returns The extracted number or undefined.
+ */
+export function getNumericSearchParam(value: string | undefined): number | undefined {
+    return value !== undefined ? parseInt(value) : undefined
+}
+
+/**
+ * Helper function for extracting a Date value from search parameters.
+ * 
+ * @param params The search parameters to extract the value from.
+ * @param key The key of the value to extract.
+ * @returns The extracted Date or undefined.
+ */
+export function getDateSearchParam(value: string | undefined): Date | undefined {
+    return value !== undefined ? new Date(value) : undefined;
+}
+
+export function pickSongDefaultOrSearchParam(params: ReadonlyURLSearchParams, defaults: SongRankingsFiltersValues, key: string): string | undefined {
+    const paramValue = params.get(key)
+    const defaultValue = defaults[key as keyof SongRankingsFiltersValues]
+    return defaultValue !== undefined ? defaultValue : paramValue !== null ? paramValue : undefined
+}
+export function pickArtistDefaultOrSearchParam(params: ReadonlyURLSearchParams, defaults: ArtistRankingsFiltersValues, key: string): string | undefined {
+    const paramValue = params.get(key)
+    const defaultValue = defaults[key as keyof ArtistRankingsFiltersValues]
+    return defaultValue !== undefined ? defaultValue : paramValue !== null ? paramValue : undefined
+}
+
 export function parseParamSelectFilterValue(
     paramValue: number | undefined,
     values: SelectFilterValue<number>[],
@@ -70,4 +105,36 @@ export function getRankingsItemTrailingSupportingText(
         default:
             return undefined
     }
+}
+
+export function buildRankingsQuery(
+    filterBarValues: SongRankingsFilterBarValues | ArtistRankingsFilterBarValues,
+    filters: RankingsFilters | ArtistRankingsFilters | TrendingFilters
+): string {
+    const queryBuilder = []
+    for (const key in filterBarValues) {
+        const value = filterBarValues[key as keyof typeof filterBarValues]
+        const filter = filters[key as keyof typeof filters]
+        if (value != undefined && filter) {
+            switch (filter.type) {
+                case FilterType.SELECT:
+                case FilterType.INPUT:
+                    if (value != (filter as InputFilter).defaultValue) queryBuilder.push(`${key}=${value}`)
+                    break
+                case FilterType.CHECKBOX:
+                    if (value) queryBuilder.push(`${key}=${encodeBoolean(value as boolean)}`)
+                    break
+                case FilterType.MULTI_ENTITY:
+                case FilterType.MULTI:
+                    const encoded = encodeMultiFilter(value as number[])
+                    if (encoded != '') queryBuilder.push(`${key}=${encoded}`)
+                    break
+                case FilterType.TIMESTAMP:
+                    queryBuilder.push(`${key}=${(value as Date).toISOString()}`)
+                    break
+            }
+        }
+    }
+
+    return queryBuilder.join('&')
 }

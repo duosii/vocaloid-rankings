@@ -4,7 +4,7 @@ export default function init(
     database: Database,
     exists: Boolean
 ) {
-    if (exists) { return }
+    //if (exists) { return }
 
     // create songs table
     database.prepare(`CREATE TABLE IF NOT EXISTS songs (
@@ -21,7 +21,11 @@ export default function init(
         fandom_url TEXT,
         last_updated TEXT NOT NULL,
         last_refreshed TEXT,
-        dormant: INTEGER NOT NULL)`).run()
+        dormant INTEGER NOT NULL)`).run()
+    database.prepare(`
+    CREATE INDEX IF NOT EXISTS idx_songs_composite 
+        ON songs (publish_date, song_type);    
+    `).run()
 
     // create songs artists table
     database.prepare(`CREATE TABLE IF NOT EXISTS songs_artists (
@@ -32,8 +36,8 @@ export default function init(
         FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE CASCADE,
         FOREIGN KEY (artist_id) REFERENCES artists (id) ON DELETE CASCADE
     )`).run()
-    database.prepare(`CREATE INDEX idx_songs_artists_artist_id_song_id
-        ON songs_artists (artist_id, song_id);`).run()
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_songs_artists_composite 
+        ON songs_artists (song_id, artist_id);`).run()
 
     // create songs names table
     database.prepare(`CREATE TABLE IF NOT EXISTS songs_names (
@@ -86,7 +90,7 @@ export default function init(
         total INTEGER NOT NULL,
         PRIMARY KEY (song_id, timestamp),
         FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE CASCADE)`).run()
-    database.prepare(`CREATE INDEX idx_views_totals_timestamp_song_id
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_views_totals_timestamp_song_id
     ON views_totals (timestamp, song_id);`).run()
 
     // create views breakdown table
@@ -98,11 +102,39 @@ export default function init(
         view_type INTEGER NOT NULL,
         PRIMARY KEY (song_id, timestamp, video_id),
         FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE CASCADE)`).run()
-    database.prepare(`CREATE INDEX idx_views_breakdowns_timestamp_song_id
-    ON views_breakdowns (timestamp, song_id);`).run()
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_views_breakdowns_composite 
+    ON views_breakdowns (timestamp, song_id, view_type, views)`).run()
 
     // create views metadata table
     database.prepare(`CREATE TABLE IF NOT EXISTS views_metadata (
         timestamp TEXT PRIMARY KEY NOT NULL,
         updated TEXT NOT NULL)`).run()
+
+    // create lists table
+    database.prepare(`CREATE TABLE IF NOT EXISTS lists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        created TEXT NOT NULL,
+        last_updated TEXT NOT NULL,
+        image TEXT NOT NULL,
+        average_color TEXT NOT NULL
+    )`).run()
+
+    // create lists localization table
+    database.prepare(`CREATE TABLE IF NOT EXISTS lists_localizations (
+        locale TEXT NOT NULL,
+        list_id INTEGER NOT NULL,
+        value TEXT NOT NULL,
+        type INTEGER NOT NULL,
+        PRIMARY KEY (list_id, locale, type),
+        FOREIGN KEY (list_id) REFERENCES lists (id) ON DELETE CASCADE
+    )`).run()
+
+    // create lists songs table
+    database.prepare(`CREATE TABLE IF NOT EXISTS lists_songs (
+        song_id INTEGER NOT NULL,
+        list_id INTEGER NOT NULL,
+        PRIMARY KEY (song_id, list_id),
+        FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE CASCADE,
+        FOREIGN KEY (list_id) REFERENCES lists (id) ON DELETE CASCADE
+    )`).run()
 }

@@ -22,8 +22,6 @@ export function RefreshSongButton(
 ) {
     const router = useRouter()
 
-    
-
     const [refreshSong, { loading, error }] = useManualQuery(REFRESH_SONG_QUERY, {
         variables: { id: songId }
     })

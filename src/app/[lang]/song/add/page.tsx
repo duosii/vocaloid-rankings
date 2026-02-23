@@ -4,14 +4,13 @@ import { Divider } from "@/components/material/divider"
 import { Metadata } from "next"
 
 export async function generateMetadata(
-    {
-        params
-    }: {
-        params: {
+    props: {
+        params: Promise<{
             lang: Locale
-        }
+        }>
     }
 ): Promise<Metadata> {
+    const params = await props.params;
     const langDict = await getDictionary(params.lang)
 
     return {
@@ -20,14 +19,13 @@ export async function generateMetadata(
 }
 
 export default async function AddSongPage(
-    {
-        params
-    }: {
-        params: {
+    props: {
+        params: Promise<{
             lang: Locale
-        }
+        }>
     }
 ) {
+    const params = await props.params;
 
     // import language dictionary
     const lang = params.lang
@@ -47,5 +45,4 @@ export default async function AddSongPage(
             <h3 className="text-lg">{langDict.add_song_example}</h3>
         </section>
     )
-
 }

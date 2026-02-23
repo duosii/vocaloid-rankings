@@ -14,14 +14,16 @@ import { Locale, getDictionary, getEntityName } from "@/localization"
 import { ArtistTypeLocaleTokens, NameTypeLocaleTokens, SongTypeLocaleTokens, SourceTypeLocaleTokens } from "@/localization/DictionaryTokenMaps"
 import { Hct, SchemeVibrant, argbFromHex } from "@material/material-color-utilities"
 import { Metadata } from "next"
-import { cookies } from "next/dist/client/components/headers"
+import { cookies } from "next/headers"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Settings } from "../../settings"
 import { RefreshSongButton } from "./refresh-song-button"
 import { DeleteSongButton } from "./delete-song-button copy"
 import { getAuthenticatedUser } from "@/lib/auth"
-import { SongViewsChart } from "./views-chart"
+//import { SongViewsChart } from "./views-chart"
+
+import type { JSX } from "react";
 
 // interfaces
 interface ViewsBreakdown {
@@ -31,17 +33,16 @@ interface ViewsBreakdown {
 }
 
 export async function generateMetadata(
-    {
-        params
-    }: {
-        params: {
+    props: {
+        params: Promise<{
             id: string,
             lang: Locale
-        }
+        }>
     }
 ): Promise<Metadata | null> {
+    const params = await props.params;
     // get settings
-    const settings = new Settings(cookies())
+    const settings = new Settings(await cookies())
     const settingTitleLanguage = settings.titleLanguage
 
     // get names
@@ -60,27 +61,26 @@ export async function generateMetadata(
 }
 
 export default async function SongPage(
-    {
-        params
-    }: {
-        params: {
+    props: {
+        params: Promise<{
             id: string
             lang: Locale
-        }
+        }>
     }
 ) {
+    const params = await props.params;
 
     // convert the id parameter into a number; get song data
     const songId = Number(params.id)
     const song = !isNaN(songId) ? await getSong(songId) : null
     if (!song) return notFound()
 
-    if (song.isDormant) {
+    if (song.isDormant && song.views) {
 
         // update song views
-        const views = await getSongMostRecentViews(song.id)
+        const views = await getSongMostRecentViews(song.id, undefined, song.views)
         if (views) {
-            await insertSongViews(song.id, views)
+            await insertSongViews(song.id, views.views)
         }
 
         // set song to not be dormant
@@ -92,7 +92,7 @@ export default async function SongPage(
     }
 
     // get settings
-    const requestCookies = cookies()
+    const requestCookies = await cookies()
     const settings = new Settings(requestCookies)
     const authUser = await getAuthenticatedUser(requestCookies)
 
@@ -272,6 +272,10 @@ export default async function SongPage(
             <header className="flex flex-col gap-5 w-full">
                 <h1 className="font-extrabold md:text-5xl md:text-left text-4xl text-center w-full"><EntityName names={songNames} preferred={settingTitleLanguage} /></h1>
                 <h2 className="font-semibold md:text-3xl text-2xl text-on-background md:text-left text-center w-full"><NumberFormatter number={songTotalViews} /> {langDict.rankings_views} </h2>
+                {/* <ul className="flex gap-3">
+                    <div className="rounded-full bg-primary text-on-primary px-3 py-1 w-fit">#324 All Time</div>
+                    <div className="rounded-full bg-tertiary text-on-tertiary px-3 py-1 w-fit">#11 in 2024</div>
+                </ul> */}
             </header>
 
             <div className="mt-3 w-full grid md:grid-cols-sidebar grid-cols-1 gap-5">
@@ -293,7 +297,7 @@ export default async function SongPage(
                                 songId={songId}
                             />
                         </> : undefined}
-                        {songRefreshedToday ? undefined : <>
+                        {songRefreshedToday && (UserAccessLevel.MODERATOR > (authUser?.accessLevel ?? UserAccessLevel.GUEST)) ? undefined : <>
                             <RefreshSongButton
                                 text={langDict.song_refresh}
                                 songId={songId}

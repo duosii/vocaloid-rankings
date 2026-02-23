@@ -33,8 +33,7 @@ const vocaDBSongURLMatcher = /vocadb\.net\/S\/(\d+)/
 
 // tables
 const blacklistedSongTypes: { [key: string]: boolean } = {
-    ["Instrumental"]: true,
-    ["MusicPV"]: true
+    ["Instrumental"]: true
 }
 
 const artistCategoryMap: { [key: string]: ArtistCategory } = {
@@ -62,13 +61,17 @@ const artistTypeMap: { [key: string]: ArtistType } = {
     'OtherVoiceSynthesizer': ArtistType.OTHER_VOICE_SYNTHESIZER,
     'OtherIndividual': ArtistType.OTHER_INDIVIDUAL,
     'OtherGroup': ArtistType.OTHER_GROUP,
-    'UTAU': ArtistType.UTAU
+    'UTAU': ArtistType.UTAU,
+    'Voiceroid': ArtistType.VOICEROID
 }
 
 const songTypeMap: { [key: string]: SongType } = {
     'Original': SongType.ORIGINAL,
     'Cover': SongType.COVER,
-    'Remix': SongType.REMIX
+    'Remix': SongType.REMIX,
+    'Remaster': SongType.REMASTER,
+    'DramaPV': SongType.DRAMA_PV,
+    "MusicPV": SongType.MUSIC_PV
 }
 
 // A blacklist of non-vocal-synth singers.
@@ -83,12 +86,14 @@ const sourcePollers: { [key: string]: VocaDBSourcePoller } = {
         type: SourceType.YOUTUBE,
         getViews: YouTube.getViews,
         getThumbnails: YouTube.getThumbnails,
+        getViewsConcurrent: YouTube.getViewsConcurrent
     },
     ["NicoNicoDouga"]: {
         dataName: "Niconico",
         type: SourceType.NICONICO,
         getViews: Niconico.getViews,
         getThumbnails: Niconico.getThumbnails,
+        getViewsConcurrent: Niconico.getViewsConcurrent
     },
     ["Bilibili"]: {
         dataName: "bilibili",
@@ -96,6 +101,7 @@ const sourcePollers: { [key: string]: VocaDBSourcePoller } = {
         idPrefix: "av",
         getViews: bilibili.getViews,
         getThumbnails: bilibili.getThumbnails,
+        getViewsConcurrent: bilibili.getViewsConcurrent
     }
 }
 
@@ -154,7 +160,7 @@ const parseVocaDBArtistDataAsync = (
             // resolve
             resolve({
                 id: artistData.id,
-                type: artistTypeMap[artistData.artistType],
+                type: artistTypeMap[artistData.artistType] ?? ArtistType.OTHER_VOICE_SYNTHESIZER,
                 publishDate: new Date(artistData.releaseDate || artistData.createDate),
                 additionDate: new Date(),
                 thumbnails,
@@ -174,14 +180,22 @@ const parseVocaDBArtistDataAsync = (
 }
 
 const parseVocaDBSongAsync = (
-    vocaDBSong: VocaDBSong
+    vocaDBSong: VocaDBSong,
+    ignoreRestrictions: boolean = false
 ): Promise<Song> => {
     return new Promise(async (resolve, reject) => {
         try {
             const songType = vocaDBSong.songType
             // check if the song type is blacklisted
-            if (blacklistedSongTypes[songType]) {
-                reject("Blacklisted song type.");
+            if (blacklistedSongTypes[songType] && !ignoreRestrictions) {
+                reject(`Blacklisted song type: ${songType}`);
+                return;
+            }
+
+            // check if the song type is after 2005
+            const publishDate = new Date(vocaDBSong.publishDate)
+            if (2005 > publishDate.getFullYear() && !ignoreRestrictions) {
+                reject("Song must be published after January 1st, 2005.")
                 return;
             }
 
@@ -212,7 +226,7 @@ const parseVocaDBSongAsync = (
                 }
             }
 
-            if (0 >= vocalSynths) {
+            if (0 >= vocalSynths && !ignoreRestrictions) {
                 return reject('The provided song must have at least one vocal synthesizer as a singer.')
             }
 
@@ -263,10 +277,9 @@ const parseVocaDBSongAsync = (
                         }
                         idBucket.push(pvID)
 
-                        const views = await poller.getViews(pvID)
+                        const views = (await poller.getViews(pvID)) ?? 0
                         const thumbnails = await poller.getThumbnails(pvID)
-                        if (!views) { return reject(`No view data found for pv ${pvID}`) }
-                        if (!thumbnails) { return reject(`No thumbnails for for pv ${pvID}`) }
+                        if (thumbnails === null) { return reject(`No thumbnails for for pv ${pvID}`) }
 
                         // add to total views
                         let breakdownBucket = viewsBreakdown[pvType]
@@ -312,6 +325,8 @@ const parseVocaDBSongAsync = (
 
             const dateNow = new Date()
 
+            const type = songTypeMap[songType]
+
             resolve({
                 id: vocaDBSong.id,
                 publishDate: new Date(vocaDBSong.publishDate),
@@ -324,8 +339,8 @@ const parseVocaDBSongAsync = (
                     total: totalViews,
                     breakdown: viewsBreakdown
                 },
-                type: songTypeMap[songType],
-                thumbnail: thumbnail,
+                type: type === undefined ? SongType.OTHER : type, // if the song type is undefined, default to the OTHER type.
+               thumbnail: thumbnail,
                 maxresThumbnail: maxResThumbnail,
                 artistsCategories: artistsCategories,
                 artists: artists,
@@ -361,7 +376,8 @@ export const getVocaDBArtist = (
 }
 
 export const getVocaDBSong = (
-    songId: Id | string
+    songId: Id | string,
+    ignoreRestrictions: boolean = false
 ): Promise<Song> => {
     return new Promise(async (resolve, reject) => {
         try {
@@ -371,7 +387,7 @@ export const getVocaDBSong = (
                 .catch(error => { reject(error); return })
             if (!serverResponse) { reject("No server response."); return; }
 
-            resolve(parseVocaDBSongAsync(serverResponse))
+            resolve(parseVocaDBSongAsync(serverResponse, ignoreRestrictions))
         } catch (error) {
             reject(error)
         }
@@ -415,10 +431,10 @@ export const getVocaDBRecentSongs = (
 
                         if (entryData.songType != "Cover") {
                             const song = await getVocaDBSong(entryData.id)
-                            const views = await getSongMostRecentViews(song.id, timestamp)
+                            const viewsResult = await getSongMostRecentViews(song.id, timestamp)
 
-                            if (views != null) {
-
+                            if (viewsResult !== null) {
+                                const views = viewsResult.views
                                 if ((views.total >= vocaDBRecentSongsViewsThreshold) && (vocaDBRecentSongsUploadDateThreshold > (timeNow.getTime() - new Date(entryData.publishDate).getTime()))) {
                                     console.log(`${entryData.id} meets views threshold (${views.total} views)`)
                                     recentSongs.push(song)

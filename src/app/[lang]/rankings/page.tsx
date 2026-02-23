@@ -2,13 +2,13 @@ import { getMostRecentViewsTimestamp } from "@/data/songsData"
 import { ArtistType, FilterDirection, FilterInclusionMode, FilterOrder, SongType, SourceType } from "@/data/types"
 import { generateTimestamp } from "@/lib/utils"
 import { Locale, getDictionary } from "@/localization"
-import { cookies } from "next/dist/client/components/headers"
+import { cookies } from "next/headers"
 import { Settings } from "../settings"
 import { RankingsList } from "./rankings-list"
 import { FilterType, RankingsFilters, SongRankingsFiltersValues } from "./types"
 import { Metadata } from "next"
 
-const filters: RankingsFilters = {
+export const songRankingsFilters: RankingsFilters = {
     search: {
         name: 'search_hint',
         key: 'search',
@@ -86,6 +86,9 @@ const filters: RankingsFilters = {
             { name: 'filter_song_type_original', value: SongType.ORIGINAL },
             { name: 'filter_song_type_remix', value: SongType.REMIX },
             { name: 'filter_song_type_cover', value: SongType.COVER },
+            { name: 'filter_song_type_remaster', value: SongType.REMASTER },
+            { name: "filter_song_type_drama_pv", value: SongType.DRAMA_PV},
+            { name: "filter_song_type_music_pv", value: SongType.MUSIC_PV},
             { name: 'filter_song_type_other', value: SongType.OTHER },
         ]
     },
@@ -98,6 +101,9 @@ const filters: RankingsFilters = {
             { name: 'filter_song_type_original', value: SongType.ORIGINAL },
             { name: 'filter_song_type_remix', value: SongType.REMIX },
             { name: 'filter_song_type_cover', value: SongType.COVER },
+            { name: 'filter_song_type_remaster', value: SongType.REMASTER },
+            { name: "filter_song_type_drama_pv", value: SongType.DRAMA_PV},
+            { name: "filter_song_type_music_pv", value: SongType.MUSIC_PV},
             { name: 'filter_song_type_other', value: SongType.OTHER },
         ]
     },
@@ -120,6 +126,7 @@ const filters: RankingsFilters = {
             { name: 'filter_artist_type_other_group', value: ArtistType.OTHER_GROUP },
             { name: 'filter_artist_type_utau', value: ArtistType.UTAU },
             { name: 'filter_artist_type_project_sekai', value: ArtistType.PROJECT_SEKAI },
+            { name: 'filter_artist_type_voiceroid', value: ArtistType.VOICEROID }
         ]
     },
     excludeArtistTypes: {
@@ -141,6 +148,7 @@ const filters: RankingsFilters = {
             { name: 'filter_artist_type_other_group', value: ArtistType.OTHER_GROUP },
             { name: 'filter_artist_type_utau', value: ArtistType.UTAU },
             { name: 'filter_artist_type_project_sekai', value: ArtistType.PROJECT_SEKAI },
+            { name: 'filter_artist_type_voiceroid', value: ArtistType.VOICEROID }
         ]
     },
     includeArtistTypesMode: {
@@ -286,14 +294,13 @@ const filters: RankingsFilters = {
 }
 
 export async function generateMetadata(
-    {
-        params
-    }: {
-        params: {
+    props: {
+        params: Promise<{
             lang: Locale
-        }
+        }>
     }
 ): Promise<Metadata> {
+    const params = await props.params;
     const langDict = await getDictionary(params.lang)
 
     return {
@@ -302,22 +309,19 @@ export async function generateMetadata(
 }
 
 export default async function RankingsPage(
-    {
-        params,
-        searchParams
-    }: {
-        params: {
+    props: {
+        params: Promise<{
             lang: Locale
-        },
-        searchParams: SongRankingsFiltersValues
+        }>
     }
 ) {
+    const params = await props.params;
     // import language dictionary
     const lang = params.lang
     const langDict = await getDictionary(lang)
 
     // get settings
-    const settings = new Settings(cookies())
+    const settings = new Settings(await cookies())
 
     // general variables
     const viewMode = settings.rankingsViewMode
@@ -329,12 +333,11 @@ export default async function RankingsPage(
             <h1 className="font-bold md:text-5xl md:text-left text-4xl text-center w-full mb-5">{langDict.rankings_page_title}</h1>
             <RankingsList
                 href=''
-                filters={filters}
-                filterValues={searchParams}
+                filters={songRankingsFilters}
+                defaultFilters={{}}
                 currentTimestamp={mostRecentTimestamp}
                 viewMode={viewMode}
             />
         </section>
     )
-
 }

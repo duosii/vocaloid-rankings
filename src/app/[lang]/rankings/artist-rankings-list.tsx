@@ -22,7 +22,8 @@ import { TransitionGroup } from "react-transition-group"
 import { useSettings } from "../../../components/providers/settings-provider"
 import { ArtistRankingsActiveFilterBar } from "./artist-rankings-filter-bar"
 import { ArtistRankingsFilterBarValues, ArtistRankingsFilters, ArtistRankingsFiltersValues, EntityNames, FilterType, InputFilter, RankingsViewMode, SongRankingsFilterBarValues } from "./types"
-import { decodeBoolean, decodeMultiFilter, encodeBoolean, encodeMultiFilter, getRankingsItemTrailingSupportingText, parseParamSelectFilterValue } from "./utils"
+import { buildRankingsQuery, decodeBoolean, decodeMultiFilter, encodeBoolean, encodeMultiFilter, getDateSearchParam, getNumericSearchParam, getRankingsItemTrailingSupportingText, parseParamSelectFilterValue, pickArtistDefaultOrSearchParam } from "./utils"
+import { useSearchParams } from "next/navigation"
 
 const GET_ARTISTS_NAMES = `
 query GetArtistsNames(
@@ -46,14 +47,14 @@ export function ArtistRankingsList(
     {
         href,
         filters,
-        filterValues,
+        defaultFilters,
         currentTimestamp,
         viewMode,
         category
     }: {
         href: string
         filters: ArtistRankingsFilters
-        filterValues: ArtistRankingsFiltersValues
+        defaultFilters: ArtistRankingsFiltersValues
         currentTimestamp: string
         viewMode: RankingsViewMode
         category: ArtistCategory
@@ -68,38 +69,15 @@ export function ArtistRankingsList(
     const settingTitleLanguage = settings.titleLanguage
     const [rankingsViewMode, setViewMode] = useState(viewMode)
 
+    // import search params
+    const searchParams = useSearchParams()
+
     // convert current timestamp to date
     const currentTimestampDate = new Date(currentTimestamp)
 
     // convert filterValues into filterBarValues
-    let [filterBarValues, setFilterValues] = useState({
-        search: filterValues.search,
-        timePeriod: filterValues.timePeriod,
-        songPublishYear: filterValues.songPublishYear,
-        songPublishMonth: filterValues.songPublishMonth,
-        songPublishDay: filterValues.songPublishDay,
-        releaseYear: filterValues.releaseYear,
-        releaseMonth: filterValues.releaseMonth,
-        releaseDay: filterValues.releaseDay,
-        includeSourceTypes: decodeMultiFilter(filterValues.includeSourceTypes),
-        excludeSourceTypes: decodeMultiFilter(filterValues.excludeSourceTypes),
-        includeSongTypes: decodeMultiFilter(filterValues.includeSongTypes),
-        excludeSongTypes: decodeMultiFilter(filterValues.excludeSongTypes),
-        includeArtistTypes: decodeMultiFilter(filterValues.includeArtistTypes),
-        excludeArtistTypes: decodeMultiFilter(filterValues.excludeArtistTypes),
-        minViews: filterValues.minViews,
-        maxViews: filterValues.maxViews,
-        orderBy: filterValues.orderBy,
-        from: filterValues.from ? new Date(filterValues.from) : undefined,
-        timestamp: filterValues.timestamp ? new Date(filterValues.timestamp) : undefined,
-        singleVideo: decodeBoolean(Number(filterValues.singleVideo)),
-        includeArtists: decodeMultiFilter(filterValues.includeArtists),
-        excludeArtists: decodeMultiFilter(filterValues.excludeArtists),
-        includeCoArtistsOf: decodeMultiFilter(filterValues.includeCoArtistsOf),
-        combineSimilarArtists: decodeBoolean(Number(filterValues.combineSimilarArtists)),
-        direction: filterValues.direction,
-        startAt: filterValues.startAt
-    } as ArtistRankingsFilterBarValues)
+    let [filterBarValuesLoaded, setFilterBarValuesLoaded] = useState(false)
+    let [filterBarValues, setFilterValues] = useState<ArtistRankingsFilterBarValues>({});
 
     // entity names state
     const [entityNames, setEntityNames] = useState({} as EntityNames)
@@ -142,13 +120,12 @@ export function ArtistRankingsList(
             excludeSourceTypes: excludeSourceTypes && excludeSourceTypes.length > 0 ? excludeSourceTypes : undefined,
             includeSongTypes: includeSongTypes && includeSongTypes.length > 0 ? includeSongTypes : undefined,
             excludeSongTypes: excludeSongTypes && excludeSongTypes.length > 0 ? excludeSongTypes : undefined,
-            includeArtistTypes: includeArtistTypes && includeArtistTypes.length > 0 ? includeArtistTypes : filters.includeArtistTypes.defaultValue,
+            includeArtistTypes: includeArtistTypes && includeArtistTypes.length > 0 ? includeArtistTypes : filters.includeArtistTypes.defaultValue?.map(value => ArtistType[value]),
             excludeArtistTypes: excludeArtistTypes && excludeArtistTypes.length > 0 ? excludeArtistTypes : undefined,
             artistCategory: ArtistCategory[category],
             songPublishDate: (songPublishYear || songPublishMonth || songPublishDay) ? buildFuzzyDate(songPublishYear, songPublishMonth, songPublishDay) : undefined,
             publishDate: (releaseYear || releaseMonth || releaseDay) ? buildFuzzyDate(releaseYear, releaseMonth, releaseDay) : undefined,
             orderBy: filterBarValues.orderBy == undefined ? undefined : FilterOrder[filters.orderBy.values[filterBarValues.orderBy].value || FilterOrder.VIEWS],
-            //direction: undefined,
             includeArtists: filterBarValues.includeArtists && filterBarValues.includeArtists.length > 0 ? [...filterBarValues.includeArtists] : undefined, // unpack artists into new table so that the reference is different
             excludeArtists: filterBarValues.excludeArtists && filterBarValues.excludeArtists.length > 0 ? [...filterBarValues.excludeArtists] : undefined,
             includeCoArtistsOf: filterBarValues.includeCoArtistsOf && filterBarValues.includeCoArtistsOf.length > 0 ? [...filterBarValues.includeCoArtistsOf] : undefined,
@@ -165,48 +142,61 @@ export function ArtistRankingsList(
     // import graphql context
     const [queryVariables, setQueryVariables] = useState(getQueryVariables)
     const { loading, error, data } = useQuery(GET_ARTIST_RANKINGS, {
-        variables: queryVariables
+        variables: queryVariables,
+        skip: !filterBarValuesLoaded
     })
     const rankingsResult = data?.artistRankings as ApiArtistRankingsFilterResult | undefined
 
     // function for saving filter values & updating the UI with the new values.
     function saveFilterValues(
-        newValues: SongRankingsFilterBarValues,
+        newValues: ArtistRankingsFilterBarValues,
         refresh: boolean = true,
-        merge: boolean = true
+        merge: boolean = true,
+        setParams: boolean = true // whether to set the query parameters or not
     ) {
         filterBarValues = merge ? { ...newValues } : newValues
         setFilterValues(filterBarValues)
         // set url
         if (refresh) {
-            const queryBuilder = []
-            for (const key in filterBarValues) {
-                const value = filterBarValues[key as keyof typeof filterBarValues]
-                const filter = filters[key as keyof typeof filters]
-                if (value != undefined && filter) {
-                    switch (filter.type) {
-                        case FilterType.SELECT:
-                        case FilterType.INPUT:
-                            if (value != (filter as InputFilter).defaultValue) queryBuilder.push(`${key}=${value}`)
-                            break
-                        case FilterType.CHECKBOX:
-                            if (value) queryBuilder.push(`${key}=${encodeBoolean(value as boolean)}`)
-                            break
-                        case FilterType.MULTI_ENTITY:
-                        case FilterType.MULTI:
-                            const encoded = encodeMultiFilter(value as number[])
-                            if (encoded != '') queryBuilder.push(`${key}=${encoded}`)
-                            break
-                        case FilterType.TIMESTAMP:
-                            queryBuilder.push(`${key}=${(value as Date).toISOString()}`)
-                            break
-                    }
-                }
+            if (setParams) {
+                history.pushState({}, 'Song rankings filter changed.', `${href}?${buildRankingsQuery(filterBarValues, filters)}`)
             }
-            history.pushState({}, 'Song rankings filter changed.', `${href}?${queryBuilder.join('&')}`)
             setQueryVariables(getQueryVariables())
         }
     }
+
+    // load search parameters
+    useEffect(() => {
+        setFilterBarValuesLoaded(true)
+        saveFilterValues({
+            search: pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'search'),
+            timePeriod: getNumericSearchParam(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'timePeriod')),
+            songPublishYear: pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'songPublishYear'),
+            songPublishMonth: pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'songPublishMonth'),
+            songPublishDay: pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'songPublishDay'),
+            releaseYear: pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'releaseYear'),
+            releaseMonth: pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'releaseMonth'),
+            releaseDay: pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'releaseDay'),
+            includeSourceTypes: decodeMultiFilter(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'includeSourceTypes')),
+            excludeSourceTypes: decodeMultiFilter(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'excludeSourceTypes')),
+            includeSongTypes: decodeMultiFilter(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'includeSongTypes')),
+            excludeSongTypes: decodeMultiFilter(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'excludeSongTypes')),
+            includeArtistTypes: decodeMultiFilter(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'includeArtistTypes')),
+            excludeArtistTypes: decodeMultiFilter(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'excludeArtistTypes')),
+            minViews: pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'minViews'),
+            maxViews: pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'maxViews'),
+            orderBy: getNumericSearchParam(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'orderBy')),
+            from: getDateSearchParam(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'from')),
+            timestamp: getDateSearchParam(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'timestamp')),
+            singleVideo: decodeBoolean(getNumericSearchParam(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'singleVideo'))),
+            includeArtists: decodeMultiFilter(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'includeArtists')),
+            excludeArtists: decodeMultiFilter(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'excludeArtists')),
+            includeCoArtistsOf: decodeMultiFilter(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'includeCoArtistsOf')),
+            combineSimilarArtists: decodeBoolean(getNumericSearchParam(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'combineSimilarArtists'))),
+            direction: getNumericSearchParam(pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'direction')),
+            startAt: pickArtistDefaultOrSearchParam(searchParams, defaultFilters, 'startAt')
+        }, true, true, false)
+    }, [])
 
     // load entity names map
     useEffect(() => {
@@ -227,7 +217,7 @@ export function ArtistRankingsList(
                 }
             }).catch(_ => { })
         }
-    }, [settingTitleLanguage])
+    }, [settingTitleLanguage, filterBarValuesLoaded])
 
     // load view mode
     useEffect(() => {
@@ -248,8 +238,8 @@ export function ArtistRankingsList(
                 setEntityNames={newNames => setEntityNames({ ...newNames })}
             />
             <Divider className="mb-5" />
-            {error ? <RankingsApiError error={error}/>
-                : !loading && (rankingsResult == undefined || 0 >= rankingsResult.results.length) ? <h2 className="text-3xl font-bold text-center text-on-background">{langDict.search_no_results}</h2>
+            {error ? <RankingsApiError error={error} />
+                : !loading && filterBarValuesLoaded && (rankingsResult == undefined || 0 >= rankingsResult.results.length) ? <h2 className="text-3xl font-bold text-center text-on-background">{langDict.search_no_results}</h2>
                     : rankingsResult == undefined ? <RankingsSkeleton elementCount={50} viewMode={rankingsViewMode} />
                         : <RankingsContainer viewMode={rankingsViewMode}>
                             <TransitionGroup component={null}>{rankingsResult.results.map(ranking => {
@@ -265,7 +255,7 @@ export function ArtistRankingsList(
                                     additionDate={artist.additionDate}
                                 />
 
-                                const trailingSupporting = getRankingsItemTrailingSupportingText(filterMode, langDict.rankings_views, langDict.rankings_song_count,  langDict.rankings_publish_date, langDict.rankings_addition_date)
+                                const trailingSupporting = getRankingsItemTrailingSupportingText(filterMode, langDict.rankings_views, langDict.rankings_song_count, langDict.rankings_publish_date, langDict.rankings_addition_date)
 
                                 return rankingsViewMode == RankingsViewMode.LIST ? (
                                     <RankingListItem

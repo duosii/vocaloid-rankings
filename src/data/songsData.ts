@@ -1,14 +1,13 @@
-import { getMostVibrantColor } from "@/lib/material/material";
 import Niconico from "@/lib/platforms/Niconico";
+import YouTube from "@/lib/platforms/YouTube";
 import bilibili from "@/lib/platforms/bilibili";
 import { generateTimestamp } from "@/lib/utils";
 import { getVocaDBRecentSongs } from "@/lib/vocadb";
-import { Hct, MaterialDynamicColors, SchemeVibrant, argbFromHex, argbFromRgb, hexFromArgb, rgbaFromArgb } from "@material/material-color-utilities";
+import { Locale } from "@/localization";
 import type { Statement } from "better-sqlite3";
-import { getPaletteFromURL } from "color-thief-node";
 import getDatabase, { Databases } from ".";
-import { Artist, ArtistCategory, ArtistPlacement, ArtistRankingsFilterParams, ArtistRankingsFilterResult, ArtistRankingsFilterResultItem, ArtistThumbnailType, ArtistThumbnails, ArtistType, FilterInclusionMode, HistoricalViews, HistoricalViewsResult, Id, NameType, Names, PlacementChange, RawArtistData, RawArtistName, RawArtistRankingResult, RawArtistThumbnail, RawSongArtist, RawSongData, RawSongName, RawSongRankingsResult, RawSongVideoId, RawViewBreakdown, Song, SongArtistsCategories, SongPlacement, SongRankingsFilterParams, SongRankingsFilterResult, SongRankingsFilterResultItem, SongType, SongVideoIds, SourceType, SqlRankingsFilterInVariables, SqlRankingsFilterParams, SqlRankingsFilterStatements, SqlSearchArtistsFilterParams, User, UserAccessLevel, Views, ViewsBreakdown } from "./types";
-import YouTube from "@/lib/platforms/YouTube";
+import { Artist, ArtistCategory, ArtistPlacement, ArtistRankingsFilterParams, ArtistRankingsFilterResult, ArtistRankingsFilterResultItem, ArtistThumbnailType, ArtistThumbnails, ArtistType, FilterInclusionMode, HistoricalViews, HistoricalViewsResult, Id, List, ListLocalizationType, ListLocalizations, NameType, Names, PlacementChange, RawArtistData, RawArtistName, RawArtistRankingResult, RawArtistThumbnail, RawList, RawListLocalization, RawListSong, RawSongArtist, RawSongData, RawSongName, RawSongRankingsResult, RawSongVideoId, RawViewBreakdown, Song, SongArtistsCategories, SongPlacement, SongRankingsFilterParams, SongRankingsFilterResult, SongRankingsFilterResultItem, SongType, SongVideoIds, SongVideoViews, SourceType, SqlRankingsFilterInVariables, SqlRankingsFilterParams, SqlRankingsFilterStatements, SqlSearchArtistsFilterParams, SqlSearchSongsFilterParams, User, UserAccessLevel, VideoViews, Views, ViewsBreakdown } from "./types";
+import { VideoId, VideoIdViewsMap } from "@/lib/platforms/types";
 
 // import database
 const db = getDatabase(Databases.SONGS_DATA)
@@ -148,7 +147,8 @@ function getSongRankingsFilterQueryParams(
         startAt: filterParams.startAt,
         minViews: filterParams.minViews,
         maxViews: filterParams.maxViews,
-        search: filterParams.search?.toLowerCase()
+        search: filterParams.search?.toLowerCase(),
+        list: filterParams.list
     }
 
     const buildInStatement = (values: Id[], prefix = '') => {
@@ -229,6 +229,7 @@ function filterSongRankingsRawSync(
                         INNER JOIN songs_artists ON songs_artists.song_id = offset_breakdowns.song_id
                         INNER JOIN songs_names ON songs_names.song_id = views_breakdowns.song_id
                         INNER JOIN artists ON artists.id = songs_artists.artist_id
+                        LEFT JOIN lists_songs ON songs.id = lists_songs.song_id AND lists_songs.list_id = :list
                         WHERE (offset_breakdowns.timestamp = CASE WHEN :daysOffset IS NULL
                                 THEN DATE(:timestamp, '-' || :timePeriodOffset || ' day')
                                 ELSE DATE(DATE(:timestamp, '-' || :daysOffset || ' day'), '-' || :timePeriodOffset || ' day')
@@ -236,6 +237,7 @@ function filterSongRankingsRawSync(
                             AND (offset_breakdowns.song_id = views_breakdowns.song_id)
                             AND (songs.publish_date LIKE :publishDate OR :publishDate IS NULL)
                             AND (songs_names.name LIKE :search OR :search IS NULL)
+                            AND (:list IS NULL OR lists_songs.song_id IS NOT NULL)
                             AND (offset_breakdowns.views = CASE WHEN :singleVideo IS NULL
                                 THEN offset_breakdowns.views
                                 ELSE
@@ -258,11 +260,13 @@ function filterSongRankingsRawSync(
                         INNER JOIN songs_artists ON songs_artists.song_id = offset_breakdowns.song_id
                         INNER JOIN songs_names ON songs_names.song_id = views_breakdowns.song_id
                         INNER JOIN artists ON artists.id = songs_artists.artist_id
+                        LEFT JOIN lists_songs ON songs.id = lists_songs.song_id AND lists_songs.list_id = :list
                         WHERE (offset_breakdowns.timestamp = DATE(:timestamp, '-' || ((julianday(:timestamp) - julianday(songs.addition_date)) + 1) || ' day')
                                 OR offset_breakdowns.timestamp = DATE(:timestamp, '-' || (julianday(:timestamp) - julianday(songs.addition_date)) || ' day'))
                             AND (offset_breakdowns.song_id = views_breakdowns.song_id)
                             AND (songs.publish_date LIKE :publishDate OR :publishDate IS NULL)
                             AND (songs_names.name LIKE :search OR :search IS NULL)
+                            AND (:list IS NULL OR lists_songs.song_id IS NOT NULL)
                             AND (offset_breakdowns.views = CASE WHEN :singleVideo IS NULL
                                 THEN offset_breakdowns.views
                                 ELSE
@@ -289,6 +293,7 @@ function filterSongRankingsRawSync(
                         INNER JOIN songs_artists ON songs_artists.song_id = offset_breakdowns.song_id
                         INNER JOIN songs_names ON songs_names.song_id = views_breakdowns.song_id
                         INNER JOIN artists ON artists.id = songs_artists.artist_id
+                        LEFT JOIN lists_songs ON songs.id = lists_songs.song_id AND lists_songs.list_id = :list
                         WHERE (offset_breakdowns.timestamp = CASE WHEN :daysOffset IS NULL
                                 THEN DATE(:timestamp, '-' || :timePeriodOffset || ' day')
                                 ELSE DATE(DATE(:timestamp, '-' || :daysOffset || ' day'), '-' || :timePeriodOffset || ' day')
@@ -296,6 +301,7 @@ function filterSongRankingsRawSync(
                             AND (offset_breakdowns.song_id = views_breakdowns.song_id)
                             AND (songs.publish_date LIKE :publishDate OR :publishDate IS NULL)
                             AND (songs_names.name LIKE :search OR :search IS NULL)
+                            AND (:list IS NULL OR lists_songs.song_id IS NOT NULL)
                             AND (offset_breakdowns.views = CASE WHEN :singleVideo IS NULL
                                 THEN offset_breakdowns.views
                                 ELSE
@@ -318,11 +324,13 @@ function filterSongRankingsRawSync(
                         INNER JOIN songs_artists ON songs_artists.song_id = offset_breakdowns.song_id
                         INNER JOIN songs_names ON songs_names.song_id = views_breakdowns.song_id
                         INNER JOIN artists ON artists.id = songs_artists.artist_id
+                        LEFT JOIN lists_songs ON songs.id = lists_songs.song_id AND lists_songs.list_id = :list
                         WHERE (offset_breakdowns.timestamp = DATE(:timestamp, '-' || ((julianday(:timestamp) - julianday(songs.addition_date)) + 1) || ' day')
                                 OR offset_breakdowns.timestamp = DATE(:timestamp, '-' || (julianday(:timestamp) - julianday(songs.addition_date)) || ' day'))
                             AND (offset_breakdowns.song_id = views_breakdowns.song_id)
                             AND (songs.publish_date LIKE :publishDate OR :publishDate IS NULL)
                             AND (songs_names.name LIKE :search OR :search IS NULL)
+                            AND (:list IS NULL OR lists_songs.song_id IS NOT NULL)
                             AND (offset_breakdowns.views = CASE WHEN :singleVideo IS NULL
                                 THEN offset_breakdowns.views
                                 ELSE
@@ -347,12 +355,14 @@ function filterSongRankingsRawSync(
         INNER JOIN songs_artists ON songs_artists.song_id = views_breakdowns.song_id
         INNER JOIN songs_names ON songs_names.song_id = views_breakdowns.song_id
         INNER JOIN artists ON artists.id = songs_artists.artist_id
+        LEFT JOIN lists_songs ON songs.id = lists_songs.song_id AND lists_songs.list_id = :list
         WHERE (views_breakdowns.timestamp = CASE WHEN :daysOffset IS NULL
                 THEN :timestamp
                 ELSE DATE(:timestamp, '-' || :daysOffset || ' day')
                 END)
             AND (songs.publish_date LIKE :publishDate OR :publishDate IS NULL)
             AND (lower(songs_names.name) LIKE :search OR :search IS NULL)
+            AND (:list IS NULL OR lists_songs.song_id IS NOT NULL)
             AND (views_breakdowns.views = CASE WHEN :singleVideo IS NULL
                 THEN views_breakdowns.views
                 ELSE
@@ -546,7 +556,7 @@ function getArtistRankingsFilterQueryParams(
         maxViews: filterParams.maxViews,
         search: filterParams.search?.toLowerCase(),
         includeCoArtistsOf: filterParams.includeCoArtistsOf ? 1 : null,
-        parentArtistId: filterParams.parentArtistId || null
+        parentArtistId: filterParams.parentArtistId || null,
     }
 
     const buildInStatement = (values: Id[], prefix = '') => {
@@ -1087,7 +1097,7 @@ function getHistoricalViewsSync(
     }
 }
 
-// Artists
+// Artists =================================================================================================================
 function buildArtist(
     artistData: RawArtistData,
     artistNames: RawArtistName[],
@@ -1271,6 +1281,7 @@ function insertArtistSync(
     artist: Artist
 ): Artist {
     const id = artist.id
+    const baseArtistExists = artist.baseArtistId === null || artist.baseArtistId === undefined ? false : artistExistsSync(artist.baseArtistId)
 
     // insert artist
     db.prepare(`
@@ -1281,7 +1292,7 @@ function insertArtistSync(
         artist.type,
         artist.publishDate.toISOString(),
         artist.additionDate.toISOString(),
-        artist.baseArtistId,
+        baseArtistExists ? artist.baseArtistId : null,
         artist.averageColor,
         artist.darkColor,
         artist.lightColor
@@ -1388,7 +1399,7 @@ function buildSearchArtistsQueryParams(
 ): SqlSearchArtistsFilterParams {
 
     const queryParams: { [key: string]: any } = {
-        query: `%${query}%`,
+        query: `%${query.toLowerCase()}%`,
         maxEntries: maxEntries,
         startAt: startAt,
     }
@@ -1426,7 +1437,7 @@ function searchArtistsSync(
         SELECT DISTINCT id
         FROM artists
         INNER JOIN artists_names ON artists_names.artist_id = id
-        WHERE (artists_names.name LIKE :query)${excludeArtistsStatement}
+        WHERE (lower(artists_names.name) LIKE :query)${excludeArtistsStatement}
         LIMIT :maxEntries
         OFFSET :startAt
     `).all(params.params) as { id: number }[]
@@ -1598,7 +1609,7 @@ function buildNames(
     return names
 }
 
-// Song
+// Song ==========================================================================================================================================
 function buildSong(
     songData: RawSongData,
     songNames: RawSongName[],
@@ -1657,16 +1668,16 @@ function getSongViewsSync(
     songId: Id,
     timestamp?: string | null
 ): Views | null {
-    const recentTimestamp = getMostRecentViewsTimestampSync(timestamp)
-    if (!recentTimestamp) {
-        return buildEntityViews([])
-    }
+    const recentTimestamp = timestamp ?? getMostRecentViewsTimestampSync(timestamp)
+    if (!recentTimestamp) return buildEntityViews([]);
 
     const breakdowns = db.prepare(`
     SELECT views, video_id, view_type
     FROM views_breakdowns
     WHERE song_id = ? AND timestamp = ?
     ORDER BY views DESC`).all(songId, recentTimestamp) as RawViewBreakdown[]
+
+    if (breakdowns.length === 0) return buildEntityViews([]);
 
     return buildEntityViews(
         breakdowns,
@@ -1708,6 +1719,38 @@ function insertSongViewsSync(
     }
 
     return views
+}
+
+/**
+ * Batch inserts multiple video views into the database.
+ * 
+ * @param videosViews 
+ * @param timestamp 
+ */
+function insertVideoViewsBatchSync(
+    videosViews: SongVideoViews[],
+    timestamp?: string
+) {
+    timestamp = timestamp || getMostRecentViewsTimestampSync() || generateTimestamp();
+
+    const transaction = db.transaction((videosViews: SongVideoViews[]) => {
+        const insertStatement = db.prepare(`
+            INSERT OR REPLACE INTO views_breakdowns (song_id, timestamp, views, video_id, view_type)
+            VALUES (?, ?, ?, ?, ?)
+        `);
+
+        for (const videoViews of videosViews) {
+            insertStatement.run(
+                videoViews.songId,
+                timestamp,
+                videoViews.views,
+                videoViews.videoId,
+                videoViews.sourceType
+            )
+        }
+    })
+    
+    transaction(videosViews);
 }
 
 function buildSongPlacement(
@@ -2061,6 +2104,84 @@ function songExistsSync(
     `).get(id) ? true : false
 }
 
+function buildSearchSongsQueryParams(
+    query: string,
+    maxEntries: number = 50,
+    startAt: number = 0,
+    excludeSongs?: Id[],
+): SqlSearchSongsFilterParams {
+
+    const queryParams: { [key: string]: any } = {
+        query: `%${query.toLowerCase()}%`,
+        maxEntries: maxEntries,
+        startAt: startAt,
+    }
+
+    const buildInStatement = (values: Id[], prefix = '') => {
+        const stringBuilder = []
+        let n = 0
+        for (const value of values) {
+            const key = `${prefix}${n}`
+            stringBuilder.push(`:${key}`)
+            queryParams[key] = value
+            n++
+        }
+        return stringBuilder.join(',')
+    }
+
+    return {
+        excludeSongs: excludeSongs ? buildInStatement(excludeSongs, 'excludeSongs') : '',
+        params: queryParams
+    }
+}
+
+function searchSongsSync(
+    query: string,
+    maxEntries: number = 50,
+    startAt: number = 0,
+    excludeSongs?: Id[],
+): Song[] {
+    const params = buildSearchSongsQueryParams(query, maxEntries, startAt, excludeSongs)
+
+    const excludeSongsValues = params.excludeSongs
+    const excludeExcludeStatement = excludeSongsValues ? ` AND (songs.id NOT IN (${excludeSongsValues}))` : ''
+
+    const results = db.prepare(`
+        SELECT DISTINCT id
+        FROM songs
+        INNER JOIN songs_names ON songs_names.song_id = id
+        WHERE ((lower(songs_names.name) LIKE :query) OR (id LIKE :query))${excludeExcludeStatement}
+        LIMIT :maxEntries
+        OFFSET :startAt
+    `).all(params.params) as { id: number }[]
+
+    // get artists from the ids
+    const songs: Song[] = []
+
+    for (const result of results) {
+        const artist = getSongSync(result.id, false)
+        if (artist) songs.push(artist)
+    }
+
+    // return the artists
+    return songs
+}
+
+export function serachSongs(
+    query: string,
+    maxEntries?: number,
+    startAt?: number,
+    excludeSongs?: Id[],
+): Promise<Song[]> {
+    return new Promise((resolve, reject) => {
+        try {
+            resolve(searchSongsSync(query, maxEntries, startAt, excludeSongs))
+        } catch (error) {
+            reject(error)
+        }
+    })
+}
+
 export function songExists(
     id: Id
 ): Promise<boolean> {
@@ -2237,8 +2358,264 @@ export function getSongHistoricalViews(
     })
 }
 
-// View Manipulation
+// lists
 
+function buildList(
+    rawList: RawList,
+    rawLocalizations: RawListLocalization[],
+    rawSongs: RawListSong[]
+): List {
+    // build names and descriptions
+    const localizations: ListLocalizations[] = [
+        {}, // ListLocalizationType.NAME
+        {}, // ListLocalizationType.DESCRIPTION
+    ]
+
+    for (const localization of rawLocalizations) {
+        const bucket = localizations[localization.type]
+        if (bucket) {
+            bucket[localization.locale as Locale] = localization.value
+        }
+    }
+
+    // build songs
+    const songIds: Id[] = rawSongs.map(rawSong => rawSong.song_id)
+
+    return {
+        id: rawList.id,
+        created: new Date(rawList.created),
+        lastUpdated: new Date(rawList.last_updated),
+        songIds: songIds,
+        names: localizations[ListLocalizationType.NAME],
+        descriptions: localizations[ListLocalizationType.DESCRIPTION],
+        image: rawList.image,
+        averageColor: rawList.average_color
+    }
+}
+
+function getListSync(
+    id: Id
+): List | null {
+
+    const rawListData = db.prepare(`
+    SELECT id, created, last_updated, image, average_color
+    FROM lists
+    WHERE id = ?`).get(id) as RawList | null
+
+    if (!rawListData) return null
+
+    // get the localizations
+    const rawListLocalizations = db.prepare(`
+    SELECT locale, list_id, value, type
+    FROM lists_localizations
+    WHERE list_id = ?`).all(id) as RawListLocalization[]
+
+    // get the songs that are in the list
+    const rawListSongs = db.prepare(`
+    SELECT song_id, list_id
+    FROM lists_songs
+    WHERE list_id = ?
+    `).all(id) as RawListSong[]
+
+    return buildList(rawListData, rawListLocalizations, rawListSongs)
+}
+
+export function getList(
+    id: Id
+): Promise<List | null> {
+    return new Promise((resolve, reject) => {
+        try {
+            resolve(getListSync(id))
+        } catch (error) {
+            reject(error)
+        }
+    })
+}
+
+function insertListLocalizationsSync(
+    id: Id,
+    type: ListLocalizationType,
+    localizations: ListLocalizations
+): void {
+    for (const [locale, value] of Object.entries(localizations)) {
+        db.prepare(`
+        INSERT INTO lists_localizations (locale, list_id, value, type)
+        VALUES (?, ?, ?, ?)`).run(
+            locale,
+            id,
+            value,
+            type
+        )
+    }
+}
+
+function insertListSongsSync(
+    listId: Id,
+    songIds: Id[]
+): void {
+    for (const songId of songIds) {
+        db.prepare(`
+        INSERT INTO lists_songs (song_id, list_id)
+        VALUES (?, ?)`).run(
+            songId,
+            listId
+        )
+    }
+}
+
+function insertListSync(
+    list: Omit<List, 'id'>
+): List {
+
+    let listId: Id = -1
+
+    db.transaction(() => {
+
+        // insert into the lists table
+        const runResult = db.prepare(`
+        INSERT INTO lists (created, last_updated, image, average_color)
+        VALUES (?, ?, ?, ?)
+        `).run(
+            list.created.toISOString(),
+            list.lastUpdated.toISOString(),
+            list.image,
+            list.averageColor
+        )
+
+        listId = runResult.lastInsertRowid
+
+        // insert localizations
+        insertListLocalizationsSync(listId, ListLocalizationType.NAME, list.names) // names
+        insertListLocalizationsSync(listId, ListLocalizationType.DESCRIPTION, list.descriptions) // descriptions
+
+        // insert songs
+        insertListSongsSync(listId, list.songIds)
+
+    })()
+
+    // return the complete list
+    const finalList = list as List
+    finalList.id = listId
+    return finalList
+}
+
+export function insertList(
+    list: Omit<List, 'id'>
+): Promise<List> {
+    return new Promise<List>((resolve, reject) => {
+        try {
+            resolve(insertListSync(list))
+        } catch (error) {
+            reject(error)
+        }
+    })
+}
+
+function updateListSync(
+    list: Partial<List> & Pick<List, 'id'>
+): List {
+    const id = list.id
+
+    const fieldMap: Record<string, string> = {
+        id: 'id',
+        created: 'created',
+        lastUpdated: 'last_updated',
+        image: 'image',
+        averageColor: 'average_color'
+    }
+
+    const sets: string[] = []
+    const values: any[] = []
+    for (const key in list) {
+        const value = list[key as keyof typeof list]
+        const mapped = fieldMap[key]
+        if (mapped && value !== undefined) {
+            sets.push(`${mapped} = ?`)
+            if (value instanceof Date) {
+                values.push(value.toISOString())
+            } else {
+                values.push(value)
+            }
+        }
+    }
+
+    // update list
+    db.transaction(() => {
+
+        if (sets.length > 0) db.prepare(`
+        UPDATE lists
+        SET ${sets.join(', ')}
+        WHERE id = ?
+        `).run([...values, id]);
+
+        // update localizations
+        const names = list.names
+        if (names) {
+            db.prepare(`
+            DELETE FROM lists_localizations
+            WHERE list_id = ? AND type = ?`).run(id, ListLocalizationType.NAME)
+
+            insertListLocalizationsSync(id, ListLocalizationType.NAME, names)
+        }
+        const descriptions = list.names
+        if (descriptions) {
+            db.prepare(`
+            DELETE FROM lists_localizations
+            WHERE list_id = ? AND type = ?`).run(id, ListLocalizationType.DESCRIPTION)
+
+            insertListLocalizationsSync(id, ListLocalizationType.DESCRIPTION, descriptions)
+        }
+
+        // update song ids
+        const songIds = list.songIds
+        if (songIds) {
+            db.prepare(`
+            DELETE FROM lists_songs
+            WHERE list_id = ?`).run(id)
+
+            insertListSongsSync(id, songIds)
+        }
+
+    })()
+
+    // return the updated artist object
+    return getListSync(id) as List
+}
+
+export function updateList(
+    list: Partial<List> & Pick<List, 'id'>
+): Promise<List> {
+    return new Promise<List>((resolve, reject) => {
+        try {
+            resolve(updateListSync(list))
+        } catch (error) {
+            reject(error)
+        }
+    })
+}
+
+function deleteListSync(
+    id: Id
+): void {
+    db.prepare(`
+    DELETE FROM lists
+    WHERE id = ?`).run(id)
+}
+
+export function deleteList(
+    id: Id
+): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+        try {
+            resolve(deleteListSync(id))
+        } catch (error) {
+            reject(error)
+        }
+    })
+}
+
+
+// View Manipulation
 const viewPlatformProviders: { [key in SourceType]: (videoId: string) => Promise<number | null> } = {
     [SourceType.YOUTUBE]: YouTube.getViews,
     [SourceType.NICONICO]: Niconico.getViews,
@@ -2251,19 +2628,25 @@ async function getPlatformViews(
     maxRetries: number = 5,
     retryDelay: number = 1000,
     depth: number = 0
-): Promise<number> {
+): Promise<number | null> {
     try {
-        return await viewPlatformProviders[platform](videoId) || 0
+        return await viewPlatformProviders[platform](videoId) || null
     } catch (error) {
         await new Promise(resolve => setTimeout(resolve, retryDelay));
-        return maxRetries > depth ? getPlatformViews(videoId, platform, maxRetries, retryDelay, depth + 1) : 0
+        return maxRetries > depth ? getPlatformViews(videoId, platform, maxRetries, retryDelay, depth + 1) : null
     }
+}
+
+export interface SongMostRecentViewsResult {
+    views: Views,
+    didFallback: boolean
 }
 
 export async function getSongMostRecentViews(
     id: Id,
-    timestamp?: string
-): Promise<Views | null> {
+    timestamp?: string,
+    fallbackViews?: Views
+): Promise<SongMostRecentViewsResult | null> {
     try {
         const song = getSongSync(id, false);
         if (!song) return null;
@@ -2271,14 +2654,32 @@ export async function getSongMostRecentViews(
         let totalViews = 0;
         const breakdown: ViewsBreakdown = {};
 
+        let didFallback = false;
+
         for (const [rawSourceType, sourceVideoIds] of Object.entries(song.videoIds)) {
             const sourceType = Number(rawSourceType) as SourceType;
+            const fallbackBucket = fallbackViews?.breakdown[sourceType]
 
             if (sourceVideoIds) {
                 const bucket = [];
-                
+
+                // generate fallback map
+                const fallbackMap: { [key: string]: number } = {};
+                if (fallbackBucket !== undefined) {
+                    for (const views of fallbackBucket) {
+                        fallbackMap[views.id] = Number(views.views)
+                    }
+                }
+
                 for (const videoId of sourceVideoIds) {
-                    const views = await getPlatformViews(videoId, sourceType)
+                    let views = await getPlatformViews(videoId, sourceType)
+                    if (views === null) {
+                        views = fallbackMap[videoId] || 0
+                        didFallback = true;
+                    } else if (fallbackMap[videoId] !== undefined && fallbackMap[videoId] > views) {
+                        views = fallbackMap[videoId]
+                        didFallback = true;
+                    }
                     bucket.push({ id: videoId, views: views });
                     totalViews += views;
                 }
@@ -2288,154 +2689,95 @@ export async function getSongMostRecentViews(
         }
 
         return {
-            total: totalViews,
-            breakdown,
-            timestamp
-        };
+            views: {
+                total: totalViews,
+                breakdown,
+                timestamp
+            },
+            didFallback: didFallback
+        }
     } catch (error) {
         throw error;
     }
 }
 
-let isRefreshing = false;
-
-interface RefreshingSong {
-    id: Id,
-    dormant: boolean,
-    publishTime: number,
-    additionTime: number
-}
+const viewPlatformBatchProviders: { [key in SourceType]: (videoIds: VideoId[], concurrency?: number, maxRetries?: number) => Promise<VideoIdViewsMap> } = {
+    [SourceType.YOUTUBE]: YouTube.getViewsConcurrent,
+    [SourceType.NICONICO]: Niconico.getViewsConcurrent,
+    [SourceType.BILIBILI]: bilibili.getViewsConcurrent
+};
 
 export async function refreshAllSongsViews(
-    maxRetries: number = 5,
-    retryDelay: number = 1000,
-    maxConcurrent: number = 15,
-    minDormantPublishAge: number = 365 * 24 * 60 * 60 * 1000, // in milliseconds, the minimum amount of ms since song publish before it can become dormant
-    minDormantAdditionAge: number = 3 * 24 * 60 * 60 * 1000, // in milliseconds, the minimum amount of ms since song addition before it can become dormant
-    minDormantViews: number = 1500 // the minimum number of daily views a song can have before it can become dormant
-): Promise<void> {
-    if (isRefreshing) throw new Error('All songs views are already being refreshed.');
+    concurrency?: number
+) {
+    const timestamp = generateTimestamp();
+    if (timestampExistsSync(timestamp)) throw new Error(`Songs views were already refreshed for timestamp "${timestamp}"`);
 
-    isRefreshing = true;
+    console.log("Refreshing views...");
+    console.time("refresh_views");
 
-    try {
-        console.log(`Updating all songs' views...`);
+    const songIdsBySourceType: Map<SourceType, RawSongVideoId[]> = new Map();
+    {
+        const songIds = db.prepare(`
+            SELECT song_id, video_id, video_type
+            FROM songs_video_ids
+            `).all() as RawSongVideoId[];
 
-        const timeNow = new Date().getTime()
-        const timestamp = generateTimestamp();
-        if (timestampExistsSync(timestamp)) throw new Error(`Songs views were already refreshed for timestamp "${timestamp}"`);
-
-        // get all non-dormant songs' ids
-        const songIds = db.prepare(`SELECT id, publish_date, addition_date, dormant FROM songs`).all() as RawSongData[];
-
-        const refreshingPromises: Promise<void>[] = [];
-
-        const throttledExecutions = async () => {
-            for (const rawSong of songIds) {
-                if (refreshingPromises.length >= maxConcurrent) {
-                    await Promise.all(refreshingPromises);
-                    refreshingPromises.length = 0; // Empty the array without creating a new reference.
-                }
-                refreshingPromises.push(
-                    retractAttempt({
-                        id: rawSong.id,
-                        dormant: rawSong.dormant == 1 ? true : false,
-                        publishTime: new Date(rawSong.publish_date).getTime(),
-                        additionTime: new Date(rawSong.addition_date).getTime()
-                    }, timestamp, 0)
-                );
+        for (const songVideoId of songIds) {
+            const sourceType = songVideoId.video_type
+            let bucket = songIdsBySourceType.get(sourceType);
+            if (bucket === undefined) {
+                bucket = [];
+                songIdsBySourceType.set(sourceType, bucket)
             }
-            await Promise.all(refreshingPromises);
-        };
-
-        const retractAttempt = async (song: RefreshingSong, timestamp: string, depth: number): Promise<void> => {
-            try {
-                const previousViews = getSongViewsSync(song.id)
-                if (!song.dormant) {
-                    const views = await getSongMostRecentViews(song.id, timestamp);
-                    if (!views) throw new Error('Most recent views was null.');
-
-                    // if the newest views fall below a certain threshold, return their view counts to their previous state
-                    let viewsReverted = false
-                    if (previousViews) {
-                        const breakdown = views.breakdown
-                        const previousBreakdown = previousViews.breakdown
-                        let newTotal = 0
-                        for (const rawSourceType in previousViews.breakdown) {
-                            const sourceType = Number(rawSourceType) as SourceType
-
-                            const bucket = breakdown[sourceType] || []
-                            const previousBucket = previousBreakdown[sourceType]
-                            const previousMap = previousBucket ? previousBucket.reduce((acc: Record<string, number | bigint>, views) => {
-                                acc[views.id] = views.views
-                                return acc;
-                            }, {}) : null
-
-                            if (previousMap) {
-                                bucket.forEach(views => {
-                                    const previousViews = previousMap[views.id]
-                                    // if 25% previousViews is greater than the most recent views, revert to the previous view count.
-                                    if (previousViews && ((Number(previousViews) * 0.25) >= views.views)) {
-                                        viewsReverted = true
-                                        views.views = previousViews
-                                    }
-                                    newTotal += Number(views.views)
-                                })
-                            }
-                        }
-                        views.total = newTotal || views.total
-                    }
-
-                    insertSongViewsSync(song.id, views);
-                    console.log(`Refreshed views for (${song.id})`);
-
-                    // make song dormant if necessary
-                    if (previousViews
-                        && (!viewsReverted)
-                        && (minDormantViews >= (Number(views.total) - Number(previousViews.total)))
-                        && ((timeNow - song.publishTime) >= minDormantPublishAge)
-                        && ((timeNow - song.additionTime) >= minDormantAdditionAge)
-                    ) {
-                        console.log(`Made (${song.id}) dormant.`)
-                        updateSongSync({
-                            id: song.id,
-                            isDormant: true
-                        })
-                    }
-                } else if (previousViews) {
-                    previousViews.timestamp = timestamp
-                    insertSongViewsSync(song.id, previousViews)
-                }
-            } catch (error) {
-                console.log(`Error when refreshing song with id (${song.id}). Error: ${error}`);
-                if (maxRetries > depth) {
-                    await new Promise(resolve => setTimeout(resolve, retryDelay));
-                    await retractAttempt(song, timestamp, depth + 1);
-                }
-            }
-        };
-
-        await throttledExecutions();
-
-        db.prepare(`INSERT INTO views_metadata (timestamp, updated) VALUES (?, ?)`).run(timestamp, new Date().toISOString());
-        console.log(`All songs' views updated.`);
-
-        // get recent songs
-        await getVocaDBRecentSongs()
-            .then(songs => {
-                for (const song of songs) {
-                    if (!songExistsSync) insertSongSync(song)
-                }
-            })
-            .catch(error => console.log(`Error when getting recent VocaDB songs: ${error}`))
-    } catch (error) {
-        throw error;
-    } finally {
-        isRefreshing = false;
+            bucket.push(songVideoId)
+        }
     }
+
+    // do each source type
+    for (const [sourceType, videoIds] of songIdsBySourceType.entries()) {
+        console.log(`Refreshing ${videoIds.length} Source Type ${sourceType} views...`)
+        console.time(`refresh_views_${sourceType}`)
+
+        const viewCounts = await viewPlatformBatchProviders[sourceType](
+            videoIds.map(result => result.video_id),
+            concurrency
+        );
+
+        const videoViews: SongVideoViews[] = [];
+        for (const video of videoIds) {
+            const videoId = video.video_id;
+            videoViews.push({
+                songId: video.song_id,
+                videoId: videoId,
+                sourceType: sourceType,
+                views: viewCounts.get(videoId) ?? 0
+            })
+        }
+
+        console.log(`Inserting ${videoViews.length} Source Type ${sourceType} views into database...`)
+        insertVideoViewsBatchSync(videoViews, timestamp)
+
+        console.timeEnd(`refresh_views_${sourceType}`)
+    }
+
+    db.prepare(`INSERT INTO views_metadata (timestamp, updated) VALUES (?, ?)`).run(timestamp, new Date().toISOString());
+    
+    console.log(`All songs' views updated.`);
+    console.timeEnd("refresh_views");
 }
 
-if (process.env.NODE_ENV === 'production') {
-    // refresh views
-    refreshAllSongsViews().catch(error => console.log(`Error when refreshing every songs' views: ${error}`))
-}
+//refreshDormant()
+
+// insertList({
+//     created: new Date(),
+//     lastUpdated: new Date(),
+//     names: {
+//         'en': 'Project VOLTAGE'
+//     },
+//     descriptions: {
+//         'en': `A collaboration between Pokémon and Hatsune Miku that asks the question “What if Hatsune Miku was a ___-type Pokémon trainer?” \nStarting September 29th, 2023, 18 new songs by 18 different Vocaloid producers, in reference to there being 18 different types of Pokémon, will be sequentially released. Each song will feature samples from the Pokémon series, with background music and sound effects from the franchise incorporated into the new tracks. \nBetween September 4th to 28th, 2023, one new illustration was revealed every day on social media, illustrated by 6 different artists.`
+//     },
+//     songIds: [586830, 586628, 579184, 584100, 534385, 536349, 538028, 532518, 563199, 557560, 566239, 581632, 560308, 578840],
+//     image: 'https://archives.bulbagarden.net/media/upload/thumb/6/6a/Project_VOLTAGE_18_Types_Song_Artwork.png/522px-Project_VOLTAGE_18_Types_Song_Artwork.png'
+// })

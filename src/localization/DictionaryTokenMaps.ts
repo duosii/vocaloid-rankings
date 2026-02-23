@@ -1,5 +1,5 @@
 import { ArtistType, NameType, SongType, SourceType } from "@/data/types";
-import type { LanguageDictionaryKey } from ".";
+import type { LanguageDictionaryKey, Locale } from ".";
 
 export const NameTypeLocaleTokens: {[key in NameType]: LanguageDictionaryKey} = {
     [NameType.ORIGINAL]: 'name_type_original',
@@ -21,18 +21,33 @@ export const ArtistTypeLocaleTokens: {[key in ArtistType]: LanguageDictionaryKey
     [ArtistType.OTHER_INDIVIDUAL]: 'filter_artist_type_other_individual',
     [ArtistType.OTHER_GROUP]: 'filter_artist_type_other_group',
     [ArtistType.UTAU]: 'filter_artist_type_utau',
-    [ArtistType.PROJECT_SEKAI]: 'filter_artist_type_project_sekai'
+    [ArtistType.PROJECT_SEKAI]: 'filter_artist_type_project_sekai',
+    [ArtistType.VOICEVOX]: 'filter_artist_type_voicevox',
+    [ArtistType.VOISONA]: 'filter_artist_type_voisona',
+    [ArtistType.NEUTRINO]: 'filter_artist_type_neutrino',
+    [ArtistType.VOICEROID]: 'filter_artist_type_voiceroid',
+    [ArtistType.NEW_TYPE]: 'filter_artist_type_new_type'
 }
 
 export const SongTypeLocaleTokens: {[key in SongType]: LanguageDictionaryKey} = {
     [SongType.ORIGINAL]: 'filter_song_type_original',
     [SongType.REMIX]: 'filter_song_type_remix',
     [SongType.COVER]: 'filter_song_type_cover',
-    [SongType.OTHER]: 'filter_song_type_other'
+    [SongType.OTHER]: 'filter_song_type_other',
+    [SongType.REMASTER]: 'filter_song_type_remaster',
+    [SongType.DRAMA_PV]: 'filter_song_type_drama_pv',
+    [SongType.MUSIC_PV]: 'filter_song_type_music_pv'
 }
 
 export const SourceTypeLocaleTokens: {[key in SourceType]: LanguageDictionaryKey} = {
     [SourceType.YOUTUBE]: 'youtube',
     [SourceType.NICONICO]: 'niconico',
     [SourceType.BILIBILI]: 'bilibili'
+}
+
+export const LangLocaleTokens: {[key in Locale]: LanguageDictionaryKey} = {
+    ['en']: 'language_english',
+    ['ja']: 'language_japanese',
+    ['es']: 'language_spanish',
+    ['fr']: 'language_french'
 }

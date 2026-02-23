@@ -1,9 +1,11 @@
-'use client'
+'use client';
 import { NameType } from "@/data/types";
 import { buildEntityNames } from "@/lib/api";
 import { ApiArtist, ApiSongArtistsCategories } from "@/lib/api/types";
 import Link from "next/link";
 import { EntityName } from "./entity-name";
+
+import type { JSX } from "react";
 
 export function SongArtistsLabel(
     {
@@ -25,7 +27,7 @@ export function SongArtistsLabel(
         categorySeparator?: string
         theme?: string
     }
-): React.ReactElement {
+): React.ReactElement<any> {
 
     const artistsMap = new Map(artists.map(artist => [artist.id, artist]))
     const vocalists: number[] = categories.vocalists
@@ -46,7 +48,7 @@ export function SongArtistsLabel(
                     }}
                 >
                     <Link
-                        href={`artist/${artist.id}`}
+                        href={`../artist/${artist.id}`}
                         className="text-on-surface-variant transition-colors hover:text-inherit"
                     >
                         <EntityName

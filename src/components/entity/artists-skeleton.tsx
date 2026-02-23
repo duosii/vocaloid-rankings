@@ -2,6 +2,8 @@ import { RankingsViewMode } from "@/app/[lang]/rankings/types";
 import { ArtistCardSkeletonItem } from "./artist-card-skeleton-item";
 import ArtistsGrid from "./artists-grid";
 
+import type { JSX } from "react";
+
 export function ArtistsSkeleton(
     {
         elementCount,

@@ -4,7 +4,7 @@ import Negotiator from 'negotiator'
 import { match as matchLocale } from '@formatjs/intl-localematcher'
 import { locales } from "@/localization";
 import { Settings } from "./app/[lang]/settings";
-import { cookies } from "next/dist/client/components/headers";
+import { cookies } from "next/headers";
 import { NameType } from "./data/types";
 
 const deafultLocale = 'en'
@@ -20,10 +20,10 @@ const getLocale = (request: NextRequest): string => {
     return matchLocale(languages, locales, deafultLocale)
 }
 
-export function middleware(
+export async function middleware(
     request: NextRequest
 ) {
-    const settings = new Settings(cookies())
+    const settings = new Settings(await cookies())
     const pathname = request.nextUrl.pathname
 
     let pathNameLocale: string | null = null

@@ -4,12 +4,14 @@ import { MinimalFilterElement } from "./minimal-filter"
 export function FilterElement(
     {
         name,
+        icon,
         nameTrailing,
         minimal = false,
         children,
         className = ''
     }: {
-        name: string,
+        name?: string,
+        icon?: string,
         nameTrailing?: React.ReactNode
         minimal?: boolean
         children?: React.ReactNode
@@ -18,5 +20,5 @@ export function FilterElement(
     }
 ) {
     return minimal ? <MinimalFilterElement name={name} className={className}>{children}</MinimalFilterElement>
-        : <FullFilterElement name={name} nameTrailing={nameTrailing} className={className}>{children}</FullFilterElement>
+        : <FullFilterElement name={name} icon={icon} nameTrailing={nameTrailing} className={className}>{children}</FullFilterElement>
 }

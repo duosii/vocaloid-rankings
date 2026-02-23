@@ -19,6 +19,8 @@ import { useRef, useState } from "react"
 import { RankingsActionBar } from "./rankings-action-bar"
 import { ArtistRankingsFilterBarValues, ArtistRankingsFilters, CheckboxFilter, EntityNames, Filter, FilterType, InputFilter, MultiFilter, RankingsViewMode, SelectFilter } from "./types"
 
+const minimumTimestampMillis = 29 * 24 * 60 * 60 * 1000
+
 export function ArtistRankingsActiveFilterBar(
     {
         filters,
@@ -48,9 +50,9 @@ export function ArtistRankingsActiveFilterBar(
     const closeDrawer = () => setDrawerOpen(false)
 
     // timeouts
-    const searchTimeout = useRef<NodeJS.Timeout>()
-    const minViewsTimeout = useRef<NodeJS.Timeout>()
-    const maxViewsTimeout = useRef<NodeJS.Timeout>()
+    const searchTimeout = useRef<NodeJS.Timeout>(undefined)
+    const minViewsTimeout = useRef<NodeJS.Timeout>(undefined)
+    const maxViewsTimeout = useRef<NodeJS.Timeout>(undefined)
 
     // options
     const sourceTypesOptions = filters.includeSourceTypes.values.map(value => langDict[value.name])
@@ -58,6 +60,7 @@ export function ArtistRankingsActiveFilterBar(
     const artistTypesOptions = filters.includeArtistTypes.values.map(value => langDict[value.name])
 
     // timestamps
+    const minimumTimestampIso = generateTimestamp(new Date(currentTimestamp.getTime() - minimumTimestampMillis))
     const currentTimestampIso = generateTimestamp(currentTimestamp)
 
     // build active filters
@@ -242,6 +245,7 @@ export function ArtistRankingsActiveFilterBar(
                     <DateFilterElement
                         name={langDict.filter_time_period_offset_custom_from}
                         value={filterValues.from || currentTimestamp}
+                        min={minimumTimestampIso}
                         max={currentTimestampIso}
                         onValueChanged={newValue => {
                             filterValues.from = newValue
@@ -253,6 +257,7 @@ export function ArtistRankingsActiveFilterBar(
                     <DateFilterElement
                         name={langDict.filter_time_period_offset_custom_to}
                         value={filterValues.timestamp || currentTimestamp}
+                        min={minimumTimestampIso}
                         max={currentTimestampIso}
                         onValueChanged={newValue => {
                             filterValues.timestamp = newValue
@@ -265,6 +270,7 @@ export function ArtistRankingsActiveFilterBar(
                 : <DateFilterElement
                     name={langDict[filters.timestamp.name]}
                     value={filterValues.timestamp || currentTimestamp}
+                    min={minimumTimestampIso}
                     max={currentTimestampIso}
                     onValueChanged={newValue => {
                         filterValues.timestamp = newValue
@@ -545,6 +551,7 @@ export function ArtistRankingsActiveFilterBar(
                         <DateFilterElement
                             name={langDict.filter_time_period_offset_custom_from}
                             value={filterValues.from || currentTimestamp}
+                            min={minimumTimestampIso}
                             max={currentTimestampIso}
                             onValueChanged={newValue => {
                                 filterValues.from = newValue
@@ -556,6 +563,7 @@ export function ArtistRankingsActiveFilterBar(
                         <DateFilterElement
                             name={langDict.filter_time_period_offset_custom_to}
                             value={filterValues.timestamp || currentTimestamp}
+                            min={minimumTimestampIso}
                             max={currentTimestampIso}
                             onValueChanged={newValue => {
                                 filterValues.timestamp = newValue
@@ -568,6 +576,7 @@ export function ArtistRankingsActiveFilterBar(
                     : <DateFilterElement
                         name={langDict[filters.timestamp.name]}
                         value={filterValues.timestamp || currentTimestamp}
+                        min={minimumTimestampIso}
                         max={currentTimestampIso}
                         onValueChanged={newValue => {
                             filterValues.timestamp = newValue

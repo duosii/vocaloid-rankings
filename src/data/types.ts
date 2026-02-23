@@ -1,3 +1,5 @@
+import { Locale } from "@/localization"
+
 export enum NameType {
     ORIGINAL,
     JAPANESE,
@@ -9,7 +11,10 @@ export enum SongType {
     ORIGINAL,
     REMIX,
     OTHER,
-    COVER
+    COVER,
+    REMASTER,
+    DRAMA_PV,
+    MUSIC_PV
 }
 
 export enum SourceType {
@@ -43,7 +48,12 @@ export enum ArtistType {
     OTHER_INDIVIDUAL,
     OTHER_GROUP,
     UTAU,
-    PROJECT_SEKAI
+    PROJECT_SEKAI,
+    VOICEVOX,
+    VOISONA,
+    NEUTRINO,
+    VOICEROID,
+    NEW_TYPE
 }
 
 export enum PlacementChange {
@@ -68,6 +78,11 @@ export enum FilterDirection {
 export enum FilterInclusionMode {
     AND,
     OR
+}
+
+export enum ListLocalizationType {
+    NAME,
+    DESCRIPTION
 }
 
 export type Names = {
@@ -189,6 +204,7 @@ export class SongRankingsFilterParams {
     minViews?: number
     maxViews?: number
     search?: string
+    list?: number
 }
 
 export class ArtistRankingsFilterParams {
@@ -360,6 +376,11 @@ export interface SqlSearchArtistsFilterParams {
     params: { [key: string]: any }
 }
 
+export interface SqlSearchSongsFilterParams {
+    excludeSongs: string,
+    params: { [key: string]: any }
+}
+
 export interface RawSongData {
     id: Id
     publish_date: string
@@ -388,8 +409,9 @@ export interface RawSongArtist {
 }
 
 export interface RawSongVideoId {
+    song_id: number
     video_id: string
-    video_type: number
+    video_type: SourceType
 }
 
 export interface RawArtistData {
@@ -417,6 +439,13 @@ export interface RawViewBreakdown {
     views: number | bigint
     video_id: string
     view_type: number
+}
+
+export interface SongVideoViews {
+    songId: number,
+    videoId: string,
+    sourceType: SourceType,
+    views: number | bigint
 }
 
 export interface RawSongRankingsResult {
@@ -471,4 +500,38 @@ export interface RawSession {
     expires: string
     user_id: string,
     stay_logged_in: number
+}
+
+// lists
+export interface RawList {
+    id: number,
+    created: string,
+    last_updated: string,
+    image: string
+    average_color: string
+}
+
+export interface RawListLocalization {
+    locale: string,
+    list_id: number,
+    value: string,
+    type: number
+}
+
+export interface RawListSong {
+    song_id: number,
+    list_id: number
+}
+
+export type ListLocalizations = { [key in Locale]?: string }
+
+export interface List {
+    id: Id
+    created: Date
+    lastUpdated: Date
+    songIds: Id[]
+    names: ListLocalizations
+    descriptions: ListLocalizations
+    averageColor: string
+    image: string
 }

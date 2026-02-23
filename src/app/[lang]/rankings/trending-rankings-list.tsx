@@ -10,7 +10,7 @@ import { RankingListItem } from "@/components/rankings/rankings-list-item"
 import { RankingsPageSelector } from "@/components/rankings/rankings-page-selector"
 import { RankingsSkeleton } from "@/components/rankings/rankings-skeleton"
 import { TransitioningRankingsGridItem } from "@/components/rankings/transitioning-rankings-grid-item"
-import { FilterDirection, FilterOrder, SourceType } from "@/data/types"
+import { FilterDirection, FilterOrder, SongType, SourceType } from "@/data/types"
 import { GET_SONG_RANKINGS, buildEntityNames } from "@/lib/api"
 import { ApiSongRankingsFilterResult } from "@/lib/api/types"
 import { getEntityName } from "@/localization"
@@ -20,21 +20,22 @@ import { useEffect, useState } from "react"
 import { TransitionGroup } from "react-transition-group"
 import { useSettings } from "../../../components/providers/settings-provider"
 import { TrendingActiveFilterBar } from "./trending-filter-bar"
-import { ArtistRankingsFilterBarValues, EntityNames, FilterType, InputFilter, RankingsViewMode, TrendingFilterBarValues, TrendingFilters, TrendingFiltersValues } from "./types"
-import { decodeMultiFilter, encodeBoolean, encodeMultiFilter, getRankingsItemTrailingSupportingText, parseParamSelectFilterValue } from "./utils"
+import { ArtistRankingsFilterBarValues, EntityNames, FilterType, InputFilter, RankingsViewMode, SongRankingsFilterBarValues, TrendingFilterBarValues, TrendingFilters, TrendingFiltersValues } from "./types"
+import { buildRankingsQuery, decodeMultiFilter, encodeBoolean, encodeMultiFilter, getDateSearchParam, getNumericSearchParam, getRankingsItemTrailingSupportingText, parseParamSelectFilterValue, pickSongDefaultOrSearchParam } from "./utils"
 import { SongArtistsLabel } from "@/components/formatters/song-artists-label"
+import { useSearchParams } from "next/navigation"
 
 export function TrendingRankingsList(
     {
         href,
         filters,
-        filterValues,
+        defaultFilters,
         currentTimestamp,
         viewMode,
     }: {
         href: string
         filters: TrendingFilters
-        filterValues: TrendingFiltersValues
+        defaultFilters: TrendingFiltersValues
         currentTimestamp: string
         viewMode: RankingsViewMode
     }
@@ -48,25 +49,23 @@ export function TrendingRankingsList(
     const settingTitleLanguage = settings.titleLanguage
     const [rankingsViewMode, setViewMode] = useState(viewMode)
 
+    // import search params
+    const searchParams = useSearchParams()
+
     // convert current timestamp to date
     const currentTimestampDate = new Date(currentTimestamp)
 
     // convert filterValues into filterBarValues
-    let [filterBarValues, setFilterValues] = useState({
-        timePeriod: filterValues.timePeriod,
-        from: filterValues.from ? new Date(filterValues.from) : undefined,
-        timestamp: filterValues.timestamp ? new Date(filterValues.timestamp) : undefined,
-        direction: filterValues.direction,
-        startAt: filterValues.startAt,
-        includeSourceTypes: decodeMultiFilter(filterValues.includeSourceTypes),
-        excludeSourceTypes: decodeMultiFilter(filterValues.excludeSourceTypes),
-    } as ArtistRankingsFilterBarValues)
+    let [filterBarValues, setFilterValues] = useState<SongRankingsFilterBarValues>({})
+    let [filterBarValuesLoaded, setFilterBarValuesLoaded] = useState(false)
 
     // returns a table of query variables for querying GraphQL with.
     const getQueryVariables = () => {
         // build & set query variables
         const includeSourceTypes = filterBarValues.includeSourceTypes?.map(type => SourceType[filters.includeSourceTypes.values[type].value || 0])
         const excludeSourceTypes = filterBarValues.excludeSourceTypes?.map(type => SourceType[filters.excludeSourceTypes.values[type].value || 0])
+        const includeSongTypes = filterBarValues.includeSongTypes?.map(type => SongType[filters.includeSongTypes.values[type].value || 0])
+        const excludeSongTypes = filterBarValues.excludeSongTypes?.map(type => SongType[filters.excludeSongTypes.values[type].value || 0])
 
         // get custom time period offset
         const to = filterBarValues.timestamp || currentTimestampDate
@@ -88,54 +87,59 @@ export function TrendingRankingsList(
             orderBy: FilterOrder[FilterOrder.POPULARITY],
             includeSourceTypes: includeSourceTypes && includeSourceTypes.length > 0 ? includeSourceTypes : undefined,
             excludeSourceTypes: excludeSourceTypes && excludeSourceTypes.length > 0 ? excludeSourceTypes : undefined,
+            includeSongTypes: includeSongTypes && includeSongTypes.length > 0 ? includeSongTypes : undefined,
+            excludeSongTypes: excludeSongTypes && excludeSongTypes.length > 0 ? excludeSongTypes : undefined
         }
     }
 
     // import graphql context
     const [queryVariables, setQueryVariables] = useState(getQueryVariables)
     const { loading, error, data } = useQuery(GET_SONG_RANKINGS, {
-        variables: queryVariables
+        variables: queryVariables,
+        skip: !filterBarValuesLoaded
     })
     const rankingsResult = data?.songRankings as ApiSongRankingsFilterResult | undefined
+    
+    let youtubePlaylistUrl: string | null = null;
+    if (rankingsResult !== undefined) {
+        // https://www.youtube.com/watch_videos?video_ids=sV2H712ldOI,_JeLNAjjBHw
+        let videoIds = rankingsResult.results.map(song => song.song.videoIds.youtube?.[0] ?? null).filter(val => val !== null);
+        youtubePlaylistUrl = `https://www.youtube.com/watch_videos?video_ids=${videoIds.join(",")}`
+    }
 
     // function for saving filter values & updating the UI with the new values.
     function saveFilterValues(
         newValues: TrendingFilterBarValues,
         refresh: boolean = true,
-        merge: boolean = true
+        merge: boolean = true,
+        setParams: boolean = true
     ) {
         filterBarValues = merge ? { ...newValues } : newValues
         setFilterValues(filterBarValues)
         // set url
         if (refresh) {
-            const queryBuilder = []
-            for (const key in filterBarValues) {
-                const value = filterBarValues[key as keyof typeof filterBarValues]
-                const filter = filters[key as keyof typeof filters]
-                if (value != undefined && filter) {
-                    switch (filter.type) {
-                        case FilterType.SELECT:
-                        case FilterType.INPUT:
-                            if (value != (filter as InputFilter).defaultValue) queryBuilder.push(`${key}=${value}`)
-                            break
-                        case FilterType.CHECKBOX:
-                            if (value) queryBuilder.push(`${key}=${encodeBoolean(value as boolean)}`)
-                            break
-                        case FilterType.MULTI_ENTITY:
-                        case FilterType.MULTI:
-                            const encoded = encodeMultiFilter(value as number[])
-                            if (encoded != '') queryBuilder.push(`${key}=${encoded}`)
-                            break
-                        case FilterType.TIMESTAMP:
-                            queryBuilder.push(`${key}=${(value as Date).toISOString()}`)
-                            break
-                    }
-                }
+            if (setParams) {
+                history.pushState({}, 'Song rankings filter changed.', `${href}?${buildRankingsQuery(filterBarValues, filters)}`)
             }
-            history.pushState({}, 'Song rankings filter changed.', `${href}?${queryBuilder.join('&')}`)
             setQueryVariables(getQueryVariables())
         }
     }
+
+    // load search parameters
+    useEffect(() => {
+        setFilterBarValuesLoaded(true)
+        saveFilterValues({
+            timePeriod: getNumericSearchParam(pickSongDefaultOrSearchParam(searchParams, defaultFilters, 'timePeriod')),
+            includeSourceTypes: decodeMultiFilter(pickSongDefaultOrSearchParam(searchParams, defaultFilters, 'includeSourceTypes')),
+            excludeSourceTypes: decodeMultiFilter(pickSongDefaultOrSearchParam(searchParams, defaultFilters, 'excludeSourceTypes')),
+            includeSongTypes: decodeMultiFilter(pickSongDefaultOrSearchParam(searchParams, defaultFilters, 'includeSongTypes')),
+            excludeSongTypes: decodeMultiFilter(pickSongDefaultOrSearchParam(searchParams, defaultFilters, 'excludeSongTypes')),
+            from: getDateSearchParam(pickSongDefaultOrSearchParam(searchParams, defaultFilters, 'from')),
+            timestamp: getDateSearchParam(pickSongDefaultOrSearchParam(searchParams, defaultFilters, 'timestamp')),
+            direction: getNumericSearchParam(pickSongDefaultOrSearchParam(searchParams, defaultFilters, 'direction')),
+            startAt: pickSongDefaultOrSearchParam(searchParams, defaultFilters, 'startAt'),
+        }, true, true, false)
+    }, [])
 
     // load view mode
     useEffect(() => {
@@ -150,6 +154,7 @@ export function TrendingRankingsList(
                 currentTimestamp={currentTimestampDate}
                 setFilterValues={saveFilterValues}
                 setRankingsViewMode={setRankingsViewMode}
+                playlistUrl={youtubePlaylistUrl}
             />
             <Divider className="mb-5" />
             {error ? <RankingsApiError error={error} />
