@@ -1,7 +1,7 @@
 # ![icon](src/app/icon.ico) Vocaloid Rankings
 A website that uses data from YouTube, Niconico, bilibili, and [VocaDB](https://github.com/VocaDB/vocadb) to rank the most viewed vocal synthesizer songs.
 
-View a live version of the website at [https://vocaloid-rankings.fly.dev](https://vocaloid-rankings.fly.dev).
+View a live version of the website at [https://vocarank.ing](https://vocarank.ing).
 
 ## Requirements
 * [Node.js v20.0.0 or higher](https://nodejs.org/en/download/current)
